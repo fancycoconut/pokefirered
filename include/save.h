@@ -54,23 +54,17 @@ struct SaveSectionOffsets
 
 #define UNKNOWN_CHECK_VALUE 0x8012025
 
+#define SECTOR_SAVE1(n)  (n)
+#define SECTOR_SAVE2(n)  ((n) + NUM_SECTORS_PER_SAVE_SLOT)
+#define SECTOR_HOF(n)    ((n) + 2 * NUM_SECTORS_PER_SAVE_SLOT)
+#define SECTOR_TTOWER(n) ((n) + 2 * NUM_SECTORS_PER_SAVE_SLOT + 2)
+
 // SetSectorDamagedStatus states
 enum
 {
     ENABLE,
     DISABLE,
     CHECK // unused
-};
-
-// Do save types
-enum
-{
-    NORMAL_SAVE,
-    LINK_SAVE,
-    EREADER_SAVE,
-    HOF_SAVE,
-    DIFFERENT_FILE_SAVE,
-    HOF_DELETE_SAVE // unused
 };
 
 extern u16 gFirstSaveSector;
@@ -84,7 +78,7 @@ extern u16 gSaveUnusedVar;
 extern u16 gSaveFileStatus;
 extern void (*gGameContinueCallback)(void);
 extern struct SaveBlockChunk gRamSaveSectionLocations[0xE];
-extern u16 gUnknown_3005420;
+extern u16 gSaveSucceeded;
 
 extern struct SaveSection gSaveDataBuffer;
 
@@ -117,11 +111,9 @@ u8 sub_80DA40C(void);
 u8 sub_80DA434(void);
 u8 sub_80DA45C(void);
 bool8 sub_80DA4A0(void);
-u8 Save_LoadGameData(u8 a1);
+u8 Save_LoadGameData(u8 saveType);
 u32 TryCopySpecialSaveSection(u8 sector, u8* dst);
-u32 sub_8153634(u8 sector, u8* src);
-void sub_8153688(u8 taskId);
-u32 sub_80DA5E0(u8 sector, u8* src);
-void sub_80DA634(u8 taskId);
+u32 TryWriteSpecialSaveSection(u8 sector, u8* src);
+void Task_SaveGame_UpdatedLinkRecords(u8 taskId);
 
 #endif // GUARD_SAVE_H

@@ -100,7 +100,7 @@ struct CgbChannel
     u8 le;
     u8 sw;
     u32 fr;
-    u32 wp;
+    u32 * wp;
     u32 cp;
     u32 tp;
     u32 pp;
@@ -368,7 +368,7 @@ extern const u8 gNoiseTable[];
 
 extern const struct PokemonCrySong gPokemonCrySongTemplate;
 
-extern const struct ToneData voicegroup_pokemon_cry;
+extern const struct ToneData voicegroup000;
 
 extern char gNumMusicPlayers[];
 extern char gMaxLines[];

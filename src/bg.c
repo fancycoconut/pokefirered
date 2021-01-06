@@ -1,3 +1,4 @@
+#include <limits.h>
 #include "global.h"
 #include "bg.h"
 #include "dma3.h"
@@ -180,7 +181,7 @@ u8 LoadBgVram(u8 bg, const void *src, u16 size, u16 destOffset, u8 mode)
 
         offset = destOffset + offset;
 
-        cursor = RequestDma3Copy(src, (void*)(offset + BG_VRAM), size, 0);
+        cursor = RequestDma3Copy(src, (void*)(offset + BG_VRAM), size, DMA3_16BIT);
 
         if (cursor == -1)
         {
@@ -356,7 +357,6 @@ void ResetBgsAndClearDma3BusyFlags(bool32 enableWindowTileAutoAlloc)
     }
 }
 
-#ifdef NONMATCHING
 void InitBgsFromTemplates(u8 bgMode, const struct BgTemplate *templates, u8 numTemplates)
 {
     int i;
@@ -390,121 +390,6 @@ void InitBgsFromTemplates(u8 bgMode, const struct BgTemplate *templates, u8 numT
         }
     }
 }
-#else
-NAKED
-void InitBgsFromTemplates(u8 bgMode, const struct BgTemplate *templates, u8 numTemplates)
-{
-    asm(".syntax unified\n\
-    push {r4-r7,lr}\n\
-    mov r7, r10\n\
-    mov r6, r9\n\
-    mov r5, r8\n\
-    push {r5-r7}\n\
-    sub sp, 0x10\n\
-    adds r5, r1, 0\n\
-    lsls r0, 24\n\
-    lsrs r0, 24\n\
-    lsls r2, 24\n\
-    lsrs r4, r2, 24\n\
-    bl SetBgModeInternal\n\
-    bl ResetBgControlStructs\n\
-    cmp r4, 0\n\
-    beq _08001712\n\
-    movs r7, 0\n\
-    ldr r0, _08001724 @ =sGpuBgConfigs2\n\
-    mov r9, r0\n\
-    adds r6, r5, 0\n\
-    ldr r2, _08001728 @ =gpu_tile_allocation_map_bg\n\
-    mov r10, r2\n\
-    mov r8, r4\n\
-_08001688:\n\
-    ldr r4, [r6]\n\
-    lsls r0, r4, 30\n\
-    lsrs r5, r0, 30\n\
-    cmp r5, 0x3\n\
-    bhi _08001704\n\
-    lsls r1, r4, 28\n\
-    lsrs r1, 30\n\
-    lsls r2, r4, 23\n\
-    lsrs r2, 27\n\
-    lsls r3, r4, 21\n\
-    lsrs r3, 30\n\
-    lsls r0, r4, 20\n\
-    lsrs r0, 31\n\
-    str r0, [sp]\n\
-    lsls r0, r4, 18\n\
-    lsrs r0, 30\n\
-    str r0, [sp, 0x4]\n\
-    str r7, [sp, 0x8]\n\
-    str r7, [sp, 0xC]\n\
-    adds r0, r5, 0\n\
-    bl SetBgControlAttributes\n\
-    lsls r4, r5, 4\n\
-    mov r5, r9\n\
-    adds r3, r4, r5\n\
-    ldr r2, [r6]\n\
-    lsls r2, 8\n\
-    lsrs r2, 22\n\
-    ldrh r0, [r3]\n\
-    ldr r5, _0800172C @ =0xfffffc00\n\
-    adds r1, r5, 0\n\
-    ands r0, r1\n\
-    orrs r0, r2\n\
-    strh r0, [r3]\n\
-    ldrb r0, [r3, 0x1]\n\
-    movs r2, 0x3D\n\
-    negs r2, r2\n\
-    adds r1, r2, 0\n\
-    ands r0, r1\n\
-    strb r0, [r3, 0x1]\n\
-    ldr r0, [r3]\n\
-    ldr r1, _08001730 @ =0x00003fff\n\
-    ands r0, r1\n\
-    str r0, [r3]\n\
-    mov r0, r9\n\
-    adds r0, 0x4\n\
-    adds r0, r4, r0\n\
-    str r7, [r0]\n\
-    mov r0, r9\n\
-    adds r0, 0x8\n\
-    adds r0, r4, r0\n\
-    str r7, [r0]\n\
-    ldr r5, _08001734 @ =sGpuBgConfigs2 + 0xC\n\
-    adds r4, r5\n\
-    str r7, [r4]\n\
-    ldr r0, [r6]\n\
-    lsls r0, 28\n\
-    lsrs r0, 30\n\
-    lsls r0, 6\n\
-    add r0, r10\n\
-    movs r1, 0x1\n\
-    strb r1, [r0]\n\
-_08001704:\n\
-    adds r6, 0x4\n\
-    movs r0, 0x1\n\
-    negs r0, r0\n\
-    add r8, r0\n\
-    mov r2, r8\n\
-    cmp r2, 0\n\
-    bne _08001688\n\
-_08001712:\n\
-    add sp, 0x10\n\
-    pop {r3-r5}\n\
-    mov r8, r3\n\
-    mov r9, r4\n\
-    mov r10, r5\n\
-    pop {r4-r7}\n\
-    pop {r0}\n\
-    bx r0\n\
-    .align 2, 0\n\
-_08001724: .4byte sGpuBgConfigs2\n\
-_08001728: .4byte gpu_tile_allocation_map_bg\n\
-_0800172C: .4byte 0xfffffc00\n\
-_08001730: .4byte 0x00003fff\n\
-_08001734: .4byte sGpuBgConfigs2 + 0xC\n\
-.syntax divided");
-}
-#endif // NONMATCHING
 
 void InitBgFromTemplate(const struct BgTemplate *template)
 {
@@ -588,7 +473,7 @@ u16 Unused_LoadBgPalette(u8 bg, const void *src, u16 size, u16 destOffset)
     if (IsInvalidBg32(bg) == FALSE)
     {
         paletteOffset = (sGpuBgConfigs2[bg].basePalette * 0x20) + (destOffset * 2);
-        cursor = RequestDma3Copy(src, (void*)(paletteOffset + BG_PLTT), size, 0);
+        cursor = RequestDma3Copy(src, (void*)(paletteOffset + BG_PLTT), size, DMA3_16BIT);
 
         if (cursor == -1)
         {
@@ -605,88 +490,25 @@ u16 Unused_LoadBgPalette(u8 bg, const void *src, u16 size, u16 destOffset)
     return (u8)cursor;
 }
 
-#ifdef NONMATCHING  // Matches everything but r5 and r6 are flipped, rrr
 bool8 IsDma3ManagerBusyWithBgCopy(void)
 {
-    u8 mod;
-    u8 div;
-    s8 reqSpace;
-
     int i;
 
     for (i = 0; i < 0x80; i++)
     {
-        div = i / 0x20;
-        mod = i % 0x20;
+        u8 div = i / 0x20;
+        u8 mod = i % 0x20;
 
-        if ((sDmaBusyBitfield[div] & (1 << mod)) != FALSE)
+        if ((sDmaBusyBitfield[div] & (1 << mod)))
         {
-            reqSpace = CheckForSpaceForDma3Request(i);
+            s8 reqSpace = WaitDma3Request(i);
             if (reqSpace == -1)
-            {
                 return TRUE;
-            }
-
             sDmaBusyBitfield[div] &= ~(1 << mod);
         }
     }
-
     return FALSE;
 }
-#else
-NAKED
-bool8 IsDma3ManagerBusyWithBgCopy(void)
-{
-    asm("push {r4-r7,lr}\n\
-    mov r5, #0\n\
-    mov r7, #0x1\n\
-    neg r7, r7\n\
-_08001ADC:\n\
-    add r0, r5, #0\n\
-    cmp r5, #0\n\
-    bge _08001AE4\n\
-    add r0, #0x1F\n\
-_08001AE4:\n\
-    asr r0, #5\n\
-    lsl r2, r0, #24\n\
-    lsl r0, #5\n\
-    sub r0, r5, r0\n\
-    lsl r0, #24\n\
-    lsr r0, #24\n\
-    ldr r1, =sDmaBusyBitfield\n\
-    lsr r2, #22\n\
-    add r4, r2, r1\n\
-    mov r6, #0x1\n\
-    lsl r6, r0\n\
-    ldr r0, [r4]\n\
-    and r0, r6\n\
-    cmp r0, #0\n\
-    beq _08001B22\n\
-    lsl r0, r5, #16\n\
-    asr r0, #16\n\
-    bl CheckForSpaceForDma3Request\n\
-    lsl r0, #24\n\
-    asr r0, #24\n\
-    cmp r0, r7\n\
-    bne _08001B1C\n\
-    mov r0, #0x1\n\
-    b _08001B2A\n\
-    .pool\n\
-_08001B1C:\n\
-    ldr r0, [r4]\n\
-    bic r0, r6\n\
-    str r0, [r4]\n\
-_08001B22:\n\
-    add r5, #0x1\n\
-    cmp r5, #0x7F\n\
-    ble _08001ADC\n\
-    mov r0, #0\n\
-_08001B2A:\n\
-    pop {r4-r7}\n\
-    pop {r1}\n\
-    bx r1\n");
-}
-#endif // NONMATCHING
 
 void ShowBg(u8 bg)
 {
@@ -732,21 +554,21 @@ u16 GetBgAttribute(u8 bg, u8 attributeId)
 {
     switch (attributeId)
     {
-        case 1:
+        case BG_ATTR_CHARBASEINDEX:
             return GetBgControlAttribute(bg, BG_CTRL_ATTR_CHARBASEINDEX);
-        case 2:
+        case BG_ATTR_MAPBASEINDEX:
             return GetBgControlAttribute(bg, BG_CTRL_ATTR_MAPBASEINDEX);
-        case 3:
+        case BG_ATTR_SCREENSIZE:
             return GetBgControlAttribute(bg, BG_CTRL_ATTR_SCREENSIZE);
-        case 4:
+        case BG_ATTR_PALETTEMODE:
             return GetBgControlAttribute(bg, BG_CTRL_ATTR_PALETTEMODE);
-        case 7:
+        case BG_ATTR_PRIORITY:
             return GetBgControlAttribute(bg, BG_CTRL_ATTR_PRIORITY);
-        case 5:
+        case BG_ATTR_MOSAIC:
             return GetBgControlAttribute(bg, BG_CTRL_ATTR_MOSAIC);
-        case 6:
+        case BG_ATTR_WRAPAROUND:
             return GetBgControlAttribute(bg, BG_CTRL_ATTR_WRAPAROUND);
-        case 8:
+        case BG_ATTR_MAPSIZE:
             switch (GetBgType(bg))
             {
                 case 0:
@@ -756,9 +578,9 @@ u16 GetBgAttribute(u8 bg, u8 attributeId)
                 default:
                     return 0;
             }
-        case 9:
+        case BG_ATTR_BGTYPE:
             return GetBgType(bg);
-        case 10:
+        case BG_ATTR_BASETILE:
             return sGpuBgConfigs2[bg].baseTile;
         default:
             return -1;
@@ -928,79 +750,58 @@ void SetBgAffine(u8 bg, u32 srcCenterX, u32 srcCenterY, s16 dispCenterX, s16 dis
     SetBgAffineInternal(bg, srcCenterX, srcCenterY, dispCenterX, dispCenterY, scaleX, scaleY, rotationAngle);
 }
 
-u8 Unused_AdjustBgMosaic(u8 a1, u8 a2)
+u8 AdjustBgMosaic(u8 value, u8 mode)
 {
-    u16 result;
-    s16 test1;
-    s16 test2;
+    u16 mosaicSize;
+    s16 bgMosaicH;
+    s16 bgMosaicV;
+    mosaicSize = GetGpuReg(REG_OFFSET_MOSAIC);
+    bgMosaicH = mosaicSize & 0xF;
+    bgMosaicV = (mosaicSize >> 4) & 0xF;
+    mosaicSize &= 0xFF00;
 
-    result = GetGpuReg(REG_OFFSET_MOSAIC);
-
-    test1 = result & 0xF;
-    test2 = (result >> 4) & 0xF;
-    result &= 0xFF00;
-
-    switch (a2)
+    switch (mode)
     {
-        case 0:
-        default:
-            test1 = a1 & 0xF;
-            test2 = a1 >> 0x4;
-            break;
-        case 1:
-            test1 = a1 & 0xF;
-            break;
-        case 2:
-            if ((test1 + a1) > 0xF)
-            {
-                test1 = 0xF;
-            }
-            else
-            {
-                test1 += a1;
-            }
-            break;
-        case 3:
-            if ((test1 - a1) < 0)
-            {
-                test1 = 0x0;
-            }
-            else
-            {
-                test1 -= a1;
-            }
-            break;
-        case 4:
-            test2 = a1 & 0xF;
-            break;
-        case 5:
-            if ((test2 + a1) > 0xF)
-            {
-                test2 = 0xF;
-            }
-            else
-            {
-                test2 += a1;
-            }
-            break;
-        case 6:
-            if ((test2 - a1) < 0)
-            {
-                test2 = 0x0;
-            }
-            else
-            {
-                test2 -= a1;
-            }
-            break;
+    case BG_MOSAIC_SET:
+    default:
+        bgMosaicH = value & 0xF;
+        bgMosaicV = value >> 0x4;
+        break;
+    case BG_MOSAIC_SET_H:
+        bgMosaicH = value & 0xF;
+        break;
+    case BG_MOSAIC_INC_H:
+        if ((bgMosaicH + value) > 0xF)
+            bgMosaicH = 0xF;
+        else
+            bgMosaicH += value;
+        break;
+    case BG_MOSAIC_DEC_H:
+        if ((bgMosaicH - value) < 0)
+            bgMosaicH = 0x0;
+        else
+            bgMosaicH -= value;
+        break;
+    case BG_MOSAIC_SET_V:
+        bgMosaicV = value & 0xF;
+        break;
+    case BG_MOSAIC_INC_V:
+        if ((bgMosaicV + value) > 0xF)
+            bgMosaicV = 0xF;
+        else
+            bgMosaicV += value;
+        break;
+    case BG_MOSAIC_DEC_V:
+        if ((bgMosaicV - value) < 0)
+            bgMosaicV = 0x0;
+        else
+            bgMosaicV -= value;
+        break;
     }
-
-    result |= ((test2 << 0x4) & 0xF0);
-    result |= (test1 & 0xF);
-
-    SetGpuReg(REG_OFFSET_MOSAIC, result);
-
-    return result;
+    mosaicSize |= ((bgMosaicV << 0x4) & 0xF0);
+    mosaicSize |= (bgMosaicH & 0xF);
+    SetGpuReg(REG_OFFSET_MOSAIC, mosaicSize);
+    return mosaicSize;
 }
 
 void SetBgTilemapBuffer(u8 bg, void *tilemap)
@@ -1108,295 +909,49 @@ void CopyToBgTilemapBufferRect_ChangePalette(u8 bg, const void *src, u8 destX, u
 {
     CopyRectToBgTilemapBufferRect(bg, src, 0, 0, rectWidth, rectHeight, destX, destY, rectWidth, rectHeight, palette, 0, 0);
 }
-// Skipping for now, it probably uses structs passed by value
-/*
-void CopyRectToBgTilemapBufferRect(u8 bg, void* src, u8 srcX, u8 srcY, u8 srcWidth, u8 srcHeight, u8 destX, u8 destY, u8 rectWidth, u8 rectHeight, u8 palette1, u16 tileOffset, u16 palette2)
+
+void CopyRectToBgTilemapBufferRect(u8 bg, const void *src, u8 srcX, u8 srcY, u8 srcWidth, u8 unused, u8 srcHeight, u8 destX, u8 destY, u8 rectWidth, u8 rectHeight, s16 palette1, s16 tileOffset)
 {
-    u16 attribute;
-    u16 mode;
-    u16 mode2;
+    u16 screenWidth, screenHeight, screenSize;
+    u16 var;
+    const void *srcPtr;
+    u16 i, j;
 
-    void* srcCopy;
-    u16 destX16;
-    u16 destY16;
-
-    if (IsInvalidBg32(bg) == FALSE && IsTileMapOutsideWram(bg) == FALSE)
+    if (!IsInvalidBg32(bg) && !IsTileMapOutsideWram(bg))
     {
-        attribute = GetBgControlAttribute(bg, BG_CTRL_ATTR_SCREENSIZE);
-        mode = GetBgMetricTextMode(bg, 0x1) * 0x20;
-        mode2 = GetBgMetricTextMode(bg, 0x2) * 0x20;
+        screenSize = GetBgControlAttribute(bg, BG_CTRL_ATTR_SCREENSIZE);
+        screenWidth = GetBgMetricTextMode(bg, 0x1) * 0x20;
+        screenHeight = GetBgMetricTextMode(bg, 0x2) * 0x20;
         switch (GetBgType(bg))
         {
-            case 0:
-                srcCopy = src;
-                for (destY16 = destY; destY16 < (destY + rectHeight); destY16++)
+        case 0:
+            srcPtr = src + ((srcY * srcWidth) + srcX) * 2;
+            for (i = destX; i < (destX + rectWidth); i++)
+            {
+                for (j = srcHeight; j < (srcHeight + destY); j++)
                 {
-                    for (destX16 = destX; destX16 < (destX + rectWidth); destX16++)
-                    {
-                        CopyTileMapEntry(&((u16*)srcCopy)[(srcY * rectWidth) + srcX], &((u16*)sGpuBgConfigs2[bg].tilemap)[GetTileMapIndexFromCoords(destX16, destY16, attribute, mode, mode2)], palette1, tileOffset, palette2);
-                    }
+                    u16 index = GetTileMapIndexFromCoords(j, i, screenSize, screenWidth, screenHeight);
+                    CopyTileMapEntry(srcPtr, sGpuBgConfigs2[bg].tilemap + (index * 2), rectHeight, palette1, tileOffset);
+                    srcPtr += 2;
                 }
-                break;
-            case 1:
-                srcCopy = src;
-                mode = GetBgMetricAffineMode(bg, 0x1);
-                for (destY16 = destY; destY16 < (destY + rectHeight); destY16++)
+                srcPtr += (srcWidth - destY) * 2;
+            }
+            break;
+        case 1:
+            srcPtr = src + ((srcY * srcWidth) + srcX);
+            var = GetBgMetricAffineMode(bg, 0x1);
+            for (i = destX; i < (destX + rectWidth); i++)
+            {
+                for (j = srcHeight; j < (srcHeight + destY); j++)
                 {
-                    for (destX16 = destX; destX16 < (destX + rectWidth); destX16++)
-                    {
-                        CopyTileMapEntry(&((u16*)srcCopy)[(srcY * rectWidth) + srcX], &((u16*)sGpuBgConfigs2[bg].tilemap)[GetTileMapIndexFromCoords(destX16, destY16, attribute, mode, mode2)], palette1, tileOffset, palette2);
-                    }
+                    *(u8*)(sGpuBgConfigs2[bg].tilemap + ((var * i) + j)) = *(u8*)(srcPtr) + palette1;
+                    srcPtr++;
                 }
-                break;
+                srcPtr += (srcWidth - destY);
+            }
+            break;
         }
     }
-}*/
-NAKED
-void CopyRectToBgTilemapBufferRect(u8 bg, const void* src, u8 srcX, u8 srcY, u8 srcWidth, u8 srcHeight, u8 destX, u8 destY, u8 rectWidth, u8 rectHeight, u8 palette1, u16 tileOffset, u16 palette2)
-{
-    asm("push {r4-r7,lr}\n\
-    mov r7, r10\n\
-    mov r6, r9\n\
-    mov r5, r8\n\
-    push {r5-r7}\n\
-    sub sp, #0x40\n\
-    str r1, [sp, #0x8]\n\
-    ldr r1, [sp, #0x60]\n\
-    ldr r4, [sp, #0x68]\n\
-    ldr r5, [sp, #0x6C]\n\
-    ldr r6, [sp, #0x70]\n\
-    ldr r7, [sp, #0x74]\n\
-    mov r8, r7\n\
-    ldr r7, [sp, #0x78]\n\
-    mov r9, r7\n\
-    ldr r7, [sp, #0x7C]\n\
-    mov r10, r7\n\
-    ldr r7, [sp, #0x80]\n\
-    mov r12, r7\n\
-    lsl r0, #24\n\
-    lsr r0, #24\n\
-    str r0, [sp, #0x4]\n\
-    lsl r2, #24\n\
-    lsr r2, #24\n\
-    str r2, [sp, #0xC]\n\
-    lsl r3, #24\n\
-    lsr r3, #24\n\
-    str r3, [sp, #0x10]\n\
-    lsl r1, #24\n\
-    lsr r7, r1, #24\n\
-    lsl r4, #24\n\
-    lsr r4, #24\n\
-    str r4, [sp, #0x14]\n\
-    lsl r5, #24\n\
-    lsr r5, #24\n\
-    lsl r6, #24\n\
-    lsr r6, #24\n\
-    str r6, [sp, #0x18]\n\
-    mov r0, r8\n\
-    lsl r0, #24\n\
-    lsr r4, r0, #24\n\
-    mov r1, r9\n\
-    lsl r1, #24\n\
-    lsr r1, #24\n\
-    str r1, [sp, #0x1C]\n\
-    mov r2, r10\n\
-    lsl r2, #16\n\
-    lsr r2, #16\n\
-    str r2, [sp, #0x20]\n\
-    mov r0, r12\n\
-    lsl r0, #16\n\
-    lsr r0, #16\n\
-    str r0, [sp, #0x24]\n\
-    ldr r0, [sp, #0x4]\n\
-    bl IsInvalidBg32\n\
-    cmp r0, #0\n\
-    beq _08002592\n\
-    b _080026EE\n\
-_08002592:\n\
-    ldr r0, [sp, #0x4]\n\
-    bl IsTileMapOutsideWram\n\
-    cmp r0, #0\n\
-    beq _0800259E\n\
-    b _080026EE\n\
-_0800259E:\n\
-    ldr r0, [sp, #0x4]\n\
-    mov r1, #0x4\n\
-    bl GetBgControlAttribute\n\
-    lsl r0, #16\n\
-    lsr r0, #16\n\
-    str r0, [sp, #0x30]\n\
-    ldr r0, [sp, #0x4]\n\
-    mov r1, #0x1\n\
-    bl GetBgMetricTextMode\n\
-    lsl r0, #21\n\
-    lsr r0, #16\n\
-    str r0, [sp, #0x28]\n\
-    ldr r0, [sp, #0x4]\n\
-    mov r1, #0x2\n\
-    bl GetBgMetricTextMode\n\
-    lsl r0, #21\n\
-    lsr r0, #16\n\
-    str r0, [sp, #0x2C]\n\
-    ldr r0, [sp, #0x4]\n\
-    bl GetBgType\n\
-    cmp r0, #0\n\
-    beq _080025D8\n\
-    cmp r0, #0x1\n\
-    beq _08002674\n\
-    b _080026EE\n\
-_080025D8:\n\
-    ldr r1, [sp, #0x10]\n\
-    add r0, r1, #0\n\
-    mul r0, r7\n\
-    ldr r2, [sp, #0xC]\n\
-    add r0, r2\n\
-    lsl r0, #1\n\
-    ldr r1, [sp, #0x8]\n\
-    add r6, r1, r0\n\
-    add r0, r5, r4\n\
-    cmp r5, r0\n\
-    blt _080025F0\n\
-    b _080026EE\n\
-_080025F0:\n\
-    ldr r2, [sp, #0x18]\n\
-    sub r2, r7, r2\n\
-    str r2, [sp, #0x34]\n\
-    str r0, [sp, #0x38]\n\
-_080025F8:\n\
-    ldr r4, [sp, #0x14]\n\
-    ldr r7, [sp, #0x18]\n\
-    add r0, r4, r7\n\
-    add r1, r5, #0x1\n\
-    str r1, [sp, #0x3C]\n\
-    cmp r4, r0\n\
-    bge _0800265A\n\
-    ldr r2, [sp, #0x4]\n\
-    lsl r0, r2, #4\n\
-    ldr r1, =sGpuBgConfigs2+4\n\
-    add r0, r1\n\
-    mov r10, r0\n\
-    ldr r7, [sp, #0x20]\n\
-    lsl r7, #16\n\
-    mov r9, r7\n\
-    ldr r1, [sp, #0x24]\n\
-    lsl r0, r1, #16\n\
-    asr r0, #16\n\
-    mov r8, r0\n\
-_0800261E:\n\
-    ldr r2, [sp, #0x2C]\n\
-    str r2, [sp]\n\
-    add r0, r4, #0\n\
-    add r1, r5, #0\n\
-    ldr r2, [sp, #0x30]\n\
-    ldr r3, [sp, #0x28]\n\
-    bl GetTileMapIndexFromCoords\n\
-    lsl r0, #16\n\
-    lsr r0, #15\n\
-    mov r7, r10\n\
-    ldr r1, [r7]\n\
-    add r1, r0\n\
-    mov r0, r8\n\
-    str r0, [sp]\n\
-    add r0, r6, #0\n\
-    ldr r2, [sp, #0x1C]\n\
-    mov r7, r9\n\
-    asr r3, r7, #16\n\
-    bl CopyTileMapEntry\n\
-    add r6, #0x2\n\
-    add r0, r4, #0x1\n\
-    lsl r0, #16\n\
-    lsr r4, r0, #16\n\
-    ldr r1, [sp, #0x14]\n\
-    ldr r2, [sp, #0x18]\n\
-    add r0, r1, r2\n\
-    cmp r4, r0\n\
-    blt _0800261E\n\
-_0800265A:\n\
-    ldr r5, [sp, #0x34]\n\
-    lsl r0, r5, #1\n\
-    add r6, r0\n\
-    ldr r7, [sp, #0x3C]\n\
-    lsl r0, r7, #16\n\
-    lsr r5, r0, #16\n\
-    ldr r0, [sp, #0x38]\n\
-    cmp r5, r0\n\
-    blt _080025F8\n\
-    b _080026EE\n\
-    .pool\n\
-_08002674:\n\
-    ldr r1, [sp, #0x10]\n\
-    add r0, r1, #0\n\
-    mul r0, r7\n\
-    ldr r2, [sp, #0xC]\n\
-    add r0, r2\n\
-    ldr r1, [sp, #0x8]\n\
-    add r6, r1, r0\n\
-    ldr r0, [sp, #0x4]\n\
-    mov r1, #0x1\n\
-    bl GetBgMetricAffineMode\n\
-    lsl r0, #16\n\
-    lsr r0, #16\n\
-    mov r9, r0\n\
-    add r0, r5, r4\n\
-    cmp r5, r0\n\
-    bge _080026EE\n\
-    ldr r2, [sp, #0x18]\n\
-    sub r2, r7, r2\n\
-    str r2, [sp, #0x34]\n\
-    str r0, [sp, #0x38]\n\
-    ldr r7, =sGpuBgConfigs2+4\n\
-    mov r10, r7\n\
-    ldr r0, [sp, #0x4]\n\
-    lsl r0, #4\n\
-    mov r8, r0\n\
-_080026A8:\n\
-    ldr r4, [sp, #0x14]\n\
-    ldr r1, [sp, #0x18]\n\
-    add r0, r4, r1\n\
-    add r2, r5, #0x1\n\
-    str r2, [sp, #0x3C]\n\
-    cmp r4, r0\n\
-    bge _080026DE\n\
-    mov r3, r8\n\
-    add r3, r10\n\
-    mov r7, r9\n\
-    mul r7, r5\n\
-    mov r12, r7\n\
-    add r2, r0, #0\n\
-_080026C2:\n\
-    ldr r1, [r3]\n\
-    mov r5, r12\n\
-    add r0, r5, r4\n\
-    add r1, r0\n\
-    ldrb r0, [r6]\n\
-    ldr r7, [sp, #0x20]\n\
-    add r0, r7\n\
-    strb r0, [r1]\n\
-    add r6, #0x1\n\
-    add r0, r4, #0x1\n\
-    lsl r0, #16\n\
-    lsr r4, r0, #16\n\
-    cmp r4, r2\n\
-    blt _080026C2\n\
-_080026DE:\n\
-    ldr r0, [sp, #0x34]\n\
-    add r6, r0\n\
-    ldr r1, [sp, #0x3C]\n\
-    lsl r0, r1, #16\n\
-    lsr r5, r0, #16\n\
-    ldr r2, [sp, #0x38]\n\
-    cmp r5, r2\n\
-    blt _080026A8\n\
-_080026EE:\n\
-    add sp, #0x40\n\
-    pop {r3-r5}\n\
-    mov r8, r3\n\
-    mov r9, r4\n\
-    mov r10, r5\n\
-    pop {r4-r7}\n\
-    pop {r0}\n\
-    bx r0\n\
-    .pool\n");
 }
 
 void FillBgTilemapBufferRect_Palette0(u8 bg, u16 tileNum, u8 x, u8 y, u8 width, u8 height)
@@ -1578,78 +1133,28 @@ u32 GetTileMapIndexFromCoords(s32 x, s32 y, s32 screenSize, u32 screenWidth, u32
     return (y * 0x20) + x;
 }
 
-#ifdef NONMATCHING // This one has some weird switch statement cases that refuse to cooperate
-void CopyTileMapEntry(u16 *src, u16 *dest, s32 palette1, u32 tileOffset, u32 palette2)
+void CopyTileMapEntry(const u16 *src, u16 *dest, s32 palette1, s32 tileOffset, s32 palette2)
 {
-    u16 test;
+    u16 var;
+
     switch (palette1)
     {
-        default:
-            if (palette1 > 0x10 || palette1 < 0)
-                test = *src + tileOffset + (palette2 << 12);
-            else
-                test = ((*src + tileOffset) & 0xFFF) + ((palette1 + palette2) << 12);
-            break;
-        case 0x10:
-            test = ((*dest & 0xFC00) + (palette2 << 12)) | ((*src + tileOffset) & 0x3FF);
-            break;
+    case 0 ... 15:
+        var = ((*src + tileOffset) & 0xFFF) + ((palette1 + palette2) << 12);
+        break;
+    case 16:
+        var = *dest;
+        var &= 0xFC00;
+        var += palette2 << 12;
+        var |= (*src + tileOffset) & 0x3FF;
+        break;
+    default:
+    case 17 ... INT_MAX:
+        var = *src + tileOffset + (palette2 << 12);
+        break;
     }
-
-    *dest = test;
+    *dest = var;
 }
-#else
-NAKED
-void CopyTileMapEntry(u16 *src, u16 *dest, s32 palette1, u32 tileOffset, u32 palette2)
-{
-    asm("push {r4-r6,lr}\n\
-    add r4, r0, #0\n\
-    add r6, r1, #0\n\
-    ldr r5, [sp, #0x10]\n\
-    cmp r2, #0x10\n\
-    beq _08002B14\n\
-    cmp r2, #0x10\n\
-    bgt _08002B34\n\
-    cmp r2, #0\n\
-    blt _08002B34\n\
-    ldrh r0, [r4]\n\
-    add r0, r3\n\
-    ldr r3, =0x00000fff\n\
-    add r1, r3, #0\n\
-    and r0, r1\n\
-    add r1, r2, r5\n\
-    lsl r1, #12\n\
-    b _08002B3A\n\
-    .pool\n\
-_08002B14:\n\
-    ldrh r1, [r6]\n\
-    mov r0, #0xFC\n\
-    lsl r0, #8\n\
-    and r1, r0\n\
-    lsl r2, r5, #12\n\
-    add r2, r1, r2\n\
-    ldrh r0, [r4]\n\
-    add r0, r3\n\
-    ldr r3, =0x000003ff\n\
-    add r1, r3, #0\n\
-    and r0, r1\n\
-    orr r0, r2\n\
-    b _08002B3C\n\
-    .pool\n\
-_08002B34:\n\
-    ldrh r0, [r4]\n\
-    add r0, r3\n\
-    lsl r1, r5, #12\n\
-_08002B3A:\n\
-    add r0, r1\n\
-_08002B3C:\n\
-    lsl r0, #16\n\
-    lsr r1, r0, #16\n\
-    strh r1, [r6]\n\
-    pop {r4-r6}\n\
-    pop {r0}\n\
-    bx r0\n");
-}
-#endif // NONMATCHING
 
 u32 GetBgType(u8 bg)
 {

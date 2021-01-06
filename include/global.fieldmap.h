@@ -1,7 +1,44 @@
 #ifndef GUARD_GLOBAL_FIELDMAP_H
 #define GUARD_GLOBAL_FIELDMAP_H
 
-#define NUM_FIELD_OBJECTS 16
+#define OBJECT_EVENTS_COUNT 16
+
+#define METATILE_COLLISION_MASK 0x0C00
+#define METATILE_ID_MASK 0x03FF
+#define METATILE_ID_UNDEFINED 0x03FF
+#define METATILE_ELEVATION_SHIFT 12
+#define METATILE_COLLISION_SHIFT 10
+#define METATILE_ELEVATION_MASK 0xF000
+
+#define METATILE_ID(tileset, name) (METATILE_##tileset##_##name)
+
+enum
+{
+    METATILE_ATTRIBUTE_BEHAVIOR,
+    METATILE_ATTRIBUTE_TERRAIN,
+    METATILE_ATTRIBUTE_2,
+    METATILE_ATTRIBUTE_3,
+    METATILE_ATTRIBUTE_ENCOUNTER_TYPE,
+    METATILE_ATTRIBUTE_5,
+    METATILE_ATTRIBUTE_LAYER_TYPE,
+    METATILE_ATTRIBUTE_7,
+    METATILE_ATTRIBUTE_COUNT,
+};
+
+enum
+{
+    TILE_ENCOUNTER_NONE,
+    TILE_ENCOUNTER_LAND,
+    TILE_ENCOUNTER_WATER,
+};
+
+enum
+{
+    TILE_TERRAIN_NORMAL,
+    TILE_TERRAIN_GRASS,
+    TILE_TERRAIN_WATER,
+    TILE_TERRAIN_WATERFALL,
+};
 
 enum
 {
@@ -13,35 +50,6 @@ enum
     CONNECTION_EMERGE
 };
 
-// map types
-enum
-{
-    MAP_TYPE_0,
-    MAP_TYPE_TOWN,
-    MAP_TYPE_CITY,
-    MAP_TYPE_ROUTE,
-    MAP_TYPE_UNDERGROUND,
-    MAP_TYPE_UNDERWATER,
-    MAP_TYPE_6,
-    MAP_TYPE_7,
-    MAP_TYPE_INDOOR,
-    MAP_TYPE_SECRET_BASE
-};
-
-// map battle scenes
-enum
-{
-    MAP_BATTLE_SCENE_NORMAL,       // 0
-    MAP_BATTLE_SCENE_GYM,          // 1
-    MAP_BATTLE_SCENE_MAGMA,        // 2
-    MAP_BATTLE_SCENE_AQUA,         // 3
-    MAP_BATTLE_SCENE_SIDNEY,       // 4
-    MAP_BATTLE_SCENE_PHOEBE,       // 5
-    MAP_BATTLE_SCENE_GLACIA,       // 6
-    MAP_BATTLE_SCENE_DRAKE,        // 7
-    MAP_BATTLE_SCENE_BATTLE_TOWER, // 8
-};
-
 typedef void (*TilesetCB)(void);
 
 struct Tileset
@@ -51,11 +59,11 @@ struct Tileset
     /*0x04*/ void *tiles;
     /*0x08*/ void *palettes;
     /*0x0c*/ void *metatiles;
-    /*0x10*/ void *metatileAttributes;
-    /*0x14*/ TilesetCB callback;
+    /*0x10*/ TilesetCB callback;
+    /*0x14*/ void *metatileAttributes;
 };
 
-struct MapData
+struct MapLayout
 {
     /*0x00*/ s32 width;
     /*0x04*/ s32 height;
@@ -63,84 +71,86 @@ struct MapData
     /*0x0c*/ u16 *map;
     /*0x10*/ struct Tileset *primaryTileset;
     /*0x14*/ struct Tileset *secondaryTileset;
+    /*0x18*/ u8 borderWidth;
+    /*0x19*/ u8 borderHeight;
 };
 
-struct BackupMapData
+struct BackupMapLayout
 {
-    s32 width;
-    s32 height;
+    s32 Xsize;
+    s32 Ysize;
     u16 *map;
 };
 
-struct MapObjectTemplate
+union __attribute__((packed)) ObjectEventRange {
+    u8 as_byte;
+    struct __attribute__((packed)) {
+        u8 x:4;
+        u8 y:4;
+    } __attribute__((aligned (1))) as_nybbles;
+} __attribute__((aligned (1)));
+
+struct ObjectEventTemplate
 {
     /*0x00*/ u8 localId;
     /*0x01*/ u8 graphicsId;
-    /*0x02*/ u8 unk2;
+    /*0x02*/ u8 inConnection;
     /*0x04*/ s16 x;
     /*0x06*/ s16 y;
     /*0x08*/ u8 elevation;
     /*0x09*/ u8 movementType;
-    /*0x0A*/ u8 unkA_0:4;
-             u8 unkA_4:4;
-    ///*0x0B*/ u8 fillerB[1];
-    /*0x0C*/ u16 unkC;
-    /*0x0E*/ u16 unkE;
+    /*0x0A*/ u16 movementRangeX:4;
+             u16 movementRangeY:4;
+    /*0x0C*/ u16 trainerType;
+    /*0x0E*/ u16 trainerRange_berryTreeId;
     /*0x10*/ const u8 *script;
     /*0x14*/ u16 flagId;
-    /*0x16*/ u8 filler_16[2];
 };  /*size = 0x18*/
 
 struct WarpEvent
 {
     s16 x, y;
-    s8 warpId;
-    u8 mapGroup;
+    u8 elevation;
+    u8 warpId;
     u8 mapNum;
-    u8 unk7;
+    u8 mapGroup;
 };
 
 struct CoordEvent
 {
-    s16 x, y;
-    u8 unk4;
-    u8 filler_5;
+    u16 x, y;
+    u8 elevation;
     u16 trigger;
     u16 index;
-    u8 filler_A[0x2];
     u8 *script;
 };
 
 struct BgEvent
 {
     u16 x, y;
-    u8 unk4;
-    u8 kind;
-    // 0x2 padding for the union beginning.
-    union { // carried over from diego's FR/LG work, seems to be the same struct
-        // in gen 3, "kind" (0x3 in BgEvent struct) determines the method to read the union.
+    u8 elevation;
+    u8 kind; // The "kind" field determines how to access bgUnion union below.
+    union {
         u8 *script;
-
-        // hidden item type probably
         struct {
-            u8 filler6[0x2];
-            u16 hiddenItemId; // flag offset to determine flag lookup
-        } hiddenItem;
-
-        // secret base type
+            u32 itemId:16;
+            u32 hiddenItemId:8; // flag offset to determine flag lookup
+            u32 quantity:7;
+            u32 isUnderfoot:1;
+        } hiddenItemStr;
+        u32 hiddenItem;
         u32 secretBaseId;
-
     } bgUnion;
 };
 
 struct MapEvents
 {
-    u8 mapObjectCount;
+    u8 objectEventCount;
     u8 warpCount;
     u8 coordEventCount;
     u8 bgEventCount;
 
-    struct MapObjectTemplate *mapObjects;
+    struct ObjectEventTemplate *objectEvents;
     struct WarpEvent *warps;
     struct CoordEvent *coordEvents;
     struct BgEvent *bgEvents;
@@ -149,9 +159,9 @@ struct MapEvents
 struct MapConnection
 {
  /*0x00*/ u8 direction;
- /*0x01*/ u32 offset;
- /*0x05*/ u8 mapGroup;
- /*0x06*/ u8 mapNum;
+ /*0x04*/ u32 offset;
+ /*0x08*/ u8 mapGroup;
+ /*0x09*/ u8 mapNum;
 };
 
 struct MapConnections
@@ -162,90 +172,88 @@ struct MapConnections
 
 struct MapHeader
 {
-    /* 0x00 */ struct MapData *mapData;
-    /* 0x04 */ struct MapEvents *events;
-    /* 0x08 */ u8 *mapScripts;
-    /* 0x0C */ struct MapConnections *connections;
+    /* 0x00 */ const struct MapLayout *mapLayout;
+    /* 0x04 */ const struct MapEvents *events;
+    /* 0x08 */ const u8 *mapScripts;
+    /* 0x0C */ const struct MapConnections *connections;
     /* 0x10 */ u16 music;
-    /* 0x12 */ u16 mapDataId;
+    /* 0x12 */ u16 mapLayoutId;
     /* 0x14 */ u8 regionMapSectionId;
     /* 0x15 */ u8 cave;
     /* 0x16 */ u8 weather;
     /* 0x17 */ u8 mapType;
-    /* 0x18 */ u8 filler_18;
-    /* 0x19 */ u8 escapeRope;
-    /* 0x1A */ u8 flags;
+    /* 0x18 */ bool8 bikingAllowed;
+    /* 0x19 */ u8 flags;
+    /* 0x1A */ s8 floorNum;
     /* 0x1B */ u8 battleType;
 };
 
-struct MapObject
+// Flags for gMapHeader.flags, as defined in the map_header_flags macro
+#define MAP_ALLOW_ESCAPE_ROPE  (1 << 0)
+#define MAP_ALLOW_RUN          (1 << 1)
+#define MAP_SHOW_MAP_NAME      (1 << 2)
+#define UNUSED_MAP_FLAGS       (1 << 3 | 1 << 4 | 1 << 5 | 1 << 6 | 1 << 7)
+
+#define SHOW_MAP_NAME_ENABLED  ((gMapHeader.flags & (MAP_SHOW_MAP_NAME | UNUSED_MAP_FLAGS)) == MAP_SHOW_MAP_NAME)
+
+struct ObjectEvent
 {
-    /*0x00*/ u32 active:1;
-             u32 mapobj_bit_1:1;
-             u32 mapobj_bit_2:1;
-             u32 mapobj_bit_3:1;
-             u32 mapobj_bit_4:1;
-             u32 mapobj_bit_5:1;
-             u32 mapobj_bit_6:1;
-             u32 mapobj_bit_7:1;
-    /*0x01*/ u32 mapobj_bit_8:1;
-             u32 mapobj_bit_9:1;
-             u32 mapobj_bit_10:1;
-             u32 mapobj_bit_11:1;
-             u32 mapobj_bit_12:1;
-             u32 mapobj_bit_13:1;
-             u32 mapobj_bit_14:1;
-             u32 mapobj_bit_15:1;
-    /*0x02*/ u32 mapobj_bit_16:1;
-             u32 mapobj_bit_17:1;
-             u32 mapobj_bit_18:1;
-             u32 mapobj_bit_19:1;
-             u32 mapobj_bit_20:1;
-             u32 mapobj_bit_21:1;
-             u32 mapobj_bit_22:1;
-             u32 mapobj_bit_23:1;
-    /*0x03*/ u32 mapobj_bit_24:1;
-             u32 mapobj_bit_25:1;
-             u32 mapobj_bit_26:1;
-             u32 mapobj_bit_27:1;
-             u32 mapobj_bit_28:1;
-             u32 mapobj_bit_29:1;
-             u32 mapobj_bit_30:1;
-             u32 mapobj_bit_31:1;
-    /*0x04*/ u8 spriteId;
-    /*0x05*/ u8 graphicsId;
-    /*0x06*/ u8 animPattern;
-    /*0x07*/ u8 trainerType;
-    /*0x08*/ u8 localId;
-    /*0x09*/ u8 mapNum;
-    /*0x0A*/ u8 mapGroup;
-    /*0x0B*/ u8 mapobj_unk_0B_0:4;
-             u8 elevation:4;
-    /*0x0C*/ struct Coords16 coords1;
-    /*0x10*/ struct Coords16 coords2;
-    /*0x14*/ struct Coords16 coords3;
-    /*0x18*/ u8 mapobj_unk_18:4;  //current direction?
-    /*0x18*/ u8 placeholder18:4;
-    /*0x19*/ union __attribute__((packed)) {
-        u8 as_byte;
-        struct __attribute__((packed)) {
-            u8 x:4;
-            u8 y:4;
-        } __attribute__((aligned (1))) as_nybbles;
-    } __attribute__((aligned (1))) range;
-    /*0x1A*/ u8 mapobj_unk_1A;
-    /*0x1B*/ u8 mapobj_unk_1B;
-    /*0x1C*/ u8 mapobj_unk_1C;
-    /*0x1D*/ u8 trainerRange_berryTreeId;
-    /*0x1E*/ u8 mapobj_unk_1E;
-    /*0x1F*/ u8 mapobj_unk_1F;
-    /*0x20*/ u8 mapobj_unk_20;
-    /*0x21*/ u8 mapobj_unk_21;
-    /*0x22*/ u8 animId;
+    /*0x00*/ /* 0*/ u32 active:1;
+             /* 1*/ u32 singleMovementActive:1;
+             /* 2*/ u32 triggerGroundEffectsOnMove:1;
+             /* 3*/ u32 triggerGroundEffectsOnStop:1;
+             /* 4*/ u32 disableCoveringGroundEffects:1;
+             /* 5*/ u32 landingJump:1;
+             /* 6*/ u32 heldMovementActive:1;
+             /* 7*/ u32 heldMovementFinished:1;
+    /*0x01*/ /* 8*/ u32 frozen:1;
+             /* 9*/ u32 facingDirectionLocked:1;
+             /*10*/ u32 disableAnim:1;
+             /*11*/ u32 enableAnim:1;
+             /*12*/ u32 inanimate:1;
+             /*13*/ u32 invisible:1;
+             /*14*/ u32 offScreen:1;
+             /*15*/ u32 trackedByCamera:1;
+    /*0x02*/ /*16*/ u32 isPlayer:1;
+             /*17*/ u32 hasReflection:1;
+             /*18*/ u32 inShortGrass:1;
+             /*19*/ u32 inShallowFlowingWater:1;
+             /*20*/ u32 inSandPile:1;
+             /*21*/ u32 inHotSprings:1;
+             /*22*/ u32 hasShadow:1;
+             /*23*/ u32 spriteAnimPausedBackup:1;
+    /*0x03*/ /*24*/ u32 spriteAffineAnimPausedBackup:1;
+             /*25*/ u32 disableJumpLandingGroundEffect:1;
+             /*26*/ u32 fixedPriority:1;
+             /*27*/ u32 hideReflection:1;
+    /*0x04*/        u8 spriteId;
+    /*0x05*/        u8 graphicsId;
+    /*0x06*/        u8 movementType;
+    /*0x07*/        u8 trainerType;
+    /*0x08*/        u8 localId;
+    /*0x09*/        u8 mapNum;
+    /*0x0A*/        u8 mapGroup;
+    /*0x0B*/        u8 currentElevation:4;
+                    u8 previousElevation:4;
+    /*0x0C*/        struct Coords16 initialCoords;
+    /*0x10*/        struct Coords16 currentCoords;
+    /*0x14*/        struct Coords16 previousCoords;
+    /*0x18*/        u8 facingDirection:4;
+    /*0x18*/        u8 movementDirection:4;
+    /*0x19*/        union ObjectEventRange range;
+    /*0x1A*/        u8 fieldEffectSpriteId;
+    /*0x1B*/        u8 warpArrowSpriteId;
+    /*0x1C*/        u8 movementActionId;
+    /*0x1D*/        u8 trainerRange_berryTreeId;
+    /*0x1E*/        u8 currentMetatileBehavior;
+    /*0x1F*/        u8 previousMetatileBehavior;
+    /*0x20*/        u8 previousMovementDirection;
+    /*0x21*/        u8 directionSequenceIndex;
+    /*0x22*/        u8 playerCopyableMovement;
     /*size = 0x24*/
 };
 
-struct MapObjectGraphicsInfo
+struct ObjectEventGraphicsInfo
 {
     /*0x00*/ u16 tileTag;
     /*0x02*/ u16 paletteTag1;
@@ -265,14 +273,25 @@ struct MapObjectGraphicsInfo
     /*0x20*/ const union AffineAnimCmd *const *affineAnims;
 };
 
-#define PLAYER_AVATAR_FLAG_ON_FOOT   (1 << 0)
-#define PLAYER_AVATAR_FLAG_MACH_BIKE (1 << 1)
-#define PLAYER_AVATAR_FLAG_ACRO_BIKE (1 << 2)
-#define PLAYER_AVATAR_FLAG_SURFING   (1 << 3)
-#define PLAYER_AVATAR_FLAG_4         (1 << 4)
-#define PLAYER_AVATAR_FLAG_5         (1 << 5)
-#define PLAYER_AVATAR_FLAG_6         (1 << 6)
-#define PLAYER_AVATAR_FLAG_DASH      (1 << 7)
+enum {
+    PLAYER_AVATAR_STATE_NORMAL,
+    PLAYER_AVATAR_STATE_MACH_BIKE,
+    PLAYER_AVATAR_STATE_ACRO_BIKE,
+    PLAYER_AVATAR_STATE_SURFING,
+    PLAYER_AVATAR_STATE_UNDERWATER,
+    PLAYER_AVATAR_STATE_FIELD_MOVE,
+    PLAYER_AVATAR_STATE_FISHING,
+    PLAYER_AVATAR_STATE_WATERING,
+};
+
+#define PLAYER_AVATAR_FLAG_ON_FOOT    (1 << PLAYER_AVATAR_STATE_NORMAL)
+#define PLAYER_AVATAR_FLAG_MACH_BIKE  (1 << PLAYER_AVATAR_STATE_MACH_BIKE)
+#define PLAYER_AVATAR_FLAG_ACRO_BIKE  (1 << PLAYER_AVATAR_STATE_ACRO_BIKE)
+#define PLAYER_AVATAR_FLAG_SURFING    (1 << PLAYER_AVATAR_STATE_SURFING)
+#define PLAYER_AVATAR_FLAG_UNDERWATER (1 << PLAYER_AVATAR_STATE_UNDERWATER)
+#define PLAYER_AVATAR_FLAG_FIELD_MOVE (1 << PLAYER_AVATAR_STATE_FIELD_MOVE)
+#define PLAYER_AVATAR_FLAG_FISHING    (1 << PLAYER_AVATAR_STATE_FISHING)
+#define PLAYER_AVATAR_FLAG_DASH       (1 << PLAYER_AVATAR_STATE_WATERING)
 
 enum
 {
@@ -287,37 +306,59 @@ enum
 
 enum
 {
-    DIR_NONE,
-    DIR_SOUTH,
-    DIR_NORTH,
-    DIR_WEST,
-    DIR_EAST,
+    COLLISION_NONE,
+    COLLISION_OUTSIDE_RANGE,
+    COLLISION_IMPASSABLE,
+    COLLISION_ELEVATION_MISMATCH,
+    COLLISION_OBJECT_EVENT,
+    COLLISION_STOP_SURFING,
+    COLLISION_LEDGE_JUMP,
+    COLLISION_PUSHED_BOULDER,
+    COLLISION_UNKNOWN_WARP_6C_6D_6E_6F,
+    COLLISION_WHEELIE_HOP,
+    COLLISION_ISOLATED_VERTICAL_RAIL,
+    COLLISION_ISOLATED_HORIZONTAL_RAIL,
+    COLLISION_VERTICAL_RAIL,
+    COLLISION_HORIZONTAL_RAIL,
+    COLLISION_COUNT
 };
 
+// player running states
 enum
 {
-    COLLISION_LEDGE_JUMP = 6
+    NOT_MOVING,
+    TURN_DIRECTION, // not the same as turning! turns your avatar without moving. also known as a turn frame in some circles
+    MOVING,
+};
+
+// player tile transition states
+enum
+{
+    T_NOT_MOVING,
+    T_TILE_TRANSITION,
+    T_TILE_CENTER, // player is on a frame in which they are centered on a tile during which the player either stops or keeps their momentum and keeps going, changing direction if necessary.
 };
 
 struct PlayerAvatar /* 0x202E858 */
 {
     /*0x00*/ u8 flags;
-    /*0x01*/ u8 bike;
-    /*0x02*/ u8 running2;
-    /*0x03*/ u8 running1;
+    /*0x01*/ u8 transitionFlags; // used to be bike, but it's not that in Emerald and probably isn't here either. maybe transition flags?
+    /*0x02*/ u8 runningState; // this is a static running state. 00 is not moving, 01 is turn direction, 02 is moving.
+    /*0x03*/ u8 tileTransitionState; // this is a transition running state: 00 is not moving, 01 is transition between tiles, 02 means you are on the frame in which you have centered on a tile but are about to keep moving, even if changing directions. 2 is also used for a ledge hop, since you are transitioning.
     /*0x04*/ u8 spriteId;
-    /*0x05*/ u8 mapObjectId;
-    /*0x06*/ u8 unk6;
+    /*0x05*/ u8 objectEventId;
+    /*0x06*/ bool8 preventStep;
     /*0x07*/ u8 gender;
+    // These are not used in FRLG
     u8 acroBikeState;
-    u8 unk9;
+    u8 newDirBackup;
     u8 bikeFrameCounter;
-    u8 unkB;
-    u32 unkC;
-    u32 unk10;
-    u8 unk14[8];
-    u8 unk1C[8];
-    // TODO: rest of struct
+    u8 bikeSpeed;
+    u32 directionHistory;
+    u32 abStartSelectHistory;
+    u8 dirTimerHistory[8];
+    // For the Rocket mazes
+    u16 lastSpinTile;
 };
 
 struct Camera
@@ -327,8 +368,8 @@ struct Camera
     s32 y;
 };
 
-extern struct MapObject gMapObjects[NUM_FIELD_OBJECTS];
-extern u8 gSelectedMapObject;
+extern struct ObjectEvent gObjectEvents[OBJECT_EVENTS_COUNT];
+extern u8 gSelectedObjectEvent;
 extern struct MapHeader gMapHeader;
 extern struct PlayerAvatar gPlayerAvatar;
 extern struct Camera gCamera;

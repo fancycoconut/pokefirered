@@ -1,15 +1,15 @@
 #include "global.h"
 #include "script.h"
 #include "event_data.h"
+#include "quest_log.h"
 
 #define RAM_SCRIPT_MAGIC 51
 #define SCRIPT_STACK_SIZE 20
 
-extern u8 gUnknown_203ADFA;
 
-extern void sub_80CBDE8(void); // field_specials
+extern void ResetContextNpcTextColor(void); // field_specials
 extern u16 CalcCRC16WithTable(u8 *data, int length); // util
-extern bool32 sub_8143FC8(void); // mevent
+extern bool32 ValidateReceivedWonderCard(void); // mevent
 
 enum
 {
@@ -18,21 +18,21 @@ enum
     SCRIPT_MODE_NATIVE,
 };
 
-EWRAM_DATA u8 gUnknown_20370A0 = 0;
-EWRAM_DATA u8 *gUnknown_20370A4 = NULL;
+EWRAM_DATA u8 gWalkAwayFromSignInhibitTimer = 0;
+EWRAM_DATA const u8 *gRAMScriptPtr = NULL;
 
-// ewram bss
-/*IWRAM_DATA*/ static u8 sScriptContext1Status;
-/*IWRAM_DATA*/ static u32 sUnusedVariable1;
-/*IWRAM_DATA*/ static struct ScriptContext sScriptContext1;
-/*IWRAM_DATA*/ static u32 sUnusedVariable2;
-/*IWRAM_DATA*/ static struct ScriptContext sScriptContext2;
-/*IWRAM_DATA*/ static bool8 sScriptContext2Enabled;
-/*IWRAM_DATA*/ static u8 gUnknown_3000F9D;
-/*IWRAM_DATA*/ static u8 gUnknown_3000F9E;
-/*IWRAM_DATA*/ static u8 gUnknown_3000F9F;
-/*IWRAM_DATA*/ static u8 gUnknown_3000FA0;
-/*IWRAM_DATA*/ static u8 gUnknown_3000FA1;
+// iwram bss
+static u8 sScriptContext1Status;
+static u32 sUnusedVariable1;
+static struct ScriptContext sScriptContext1;
+static u32 sUnusedVariable2;
+static struct ScriptContext sScriptContext2;
+static bool8 sScriptContext2Enabled;
+static u8 sMsgBoxWalkawayDisabled;
+static u8 sMsgBoxIsCancelable;
+static u8 sQuestLogInput;
+static u8 sQuestLogInputIsDpad;
+static u8 sMsgIsSignPost;
 
 extern ScrCmdFunc gScriptCmdTable[];
 extern ScrCmdFunc gScriptCmdTableEnd[];
@@ -202,95 +202,95 @@ bool8 ScriptContext2_IsEnabled(void)
     return sScriptContext2Enabled;
 }
 
-void sub_8069964(void)
+void SetQuestLogInputIsDpadFlag(void)
 {
-    gUnknown_3000FA0 = 1;
+    sQuestLogInputIsDpad = TRUE;
 }
 
-void sub_8069970(void)
+void ClearQuestLogInputIsDpadFlag(void)
 {
-    gUnknown_3000FA0 = 0;
+    sQuestLogInputIsDpad = FALSE;
 }
 
-bool8 sub_806997C(void)
+bool8 IsQuestLogInputDpad(void)
 {
-    if(gUnknown_3000FA0 == TRUE)
+    if(sQuestLogInputIsDpad == TRUE)
         return TRUE;
     else
         return FALSE;
 }
 
-void sub_8069998(u8 var)
+void RegisterQuestLogInput(u8 var)
 {
-    gUnknown_3000F9F = var;
+    sQuestLogInput = var;
 }
 
-void sub_80699A4(void)
+void ClearQuestLogInput(void)
 {
-    gUnknown_3000F9F = 0;
+    sQuestLogInput = 0;
 }
 
-u8 sub_80699B0(void)
+u8 GetRegisteredQuestLogInput(void)
 {
-    return gUnknown_3000F9F;
+    return sQuestLogInput;
 }
 
-void sub_80699BC(void)
+void DisableMsgBoxWalkaway(void)
 {
-    gUnknown_3000F9D = 1;
+    sMsgBoxWalkawayDisabled = TRUE;
 }
 
-void sub_80699C8(void)
+void EnableMsgBoxWalkaway(void)
 {
-    gUnknown_3000F9D = 0;
+    sMsgBoxWalkawayDisabled = FALSE;
 }
 
-u8 sub_80699D4(void)
+bool8 IsMsgBoxWalkawayDisabled(void)
 {
-    return gUnknown_3000F9D;
+    return sMsgBoxWalkawayDisabled;
 }
 
-void sub_80699E0(void)
+void SetWalkingIntoSignVars(void)
 {
-    gUnknown_20370A0 = 6;
-    gUnknown_3000F9E = 1;
+    gWalkAwayFromSignInhibitTimer = 6;
+    sMsgBoxIsCancelable = TRUE;
 }
 
-void sub_80699F8(void)
+void ClearMsgBoxCancelableState(void)
 {
-    gUnknown_3000F9E = 0;
+    sMsgBoxIsCancelable = FALSE;
 }
 
-bool8 sub_8069A04(void)
+bool8 CanWalkAwayToCancelMsgBox(void)
 {
-    if(gUnknown_3000F9E == TRUE)
+    if(sMsgBoxIsCancelable == TRUE)
         return TRUE;
     else
         return FALSE;
 }
 
-void sub_8069A20(void)
+void MsgSetSignPost(void)
 {
-    gUnknown_3000FA1 = 1;
+    sMsgIsSignPost = TRUE;
 }
 
-void sub_8069A2C(void)
+void MsgSetNotSignPost(void)
 {
-    gUnknown_3000FA1 = 0;
+    sMsgIsSignPost = FALSE;
 }
 
-bool8 sub_8069A38(void)
+bool8 IsMsgSignPost(void)
 {
-    if(gUnknown_3000FA1 == TRUE)
+    if(sMsgIsSignPost == TRUE)
         return TRUE;
     else
         return FALSE;
 }
 
-void sub_8069A54(void)
+void ResetFacingNpcOrSignPostVars(void)
 {
-    sub_80CBDE8();
-    sub_8069A2C();
+    ResetContextNpcTextColor();
+    MsgSetNotSignPost();
 }
 
 bool8 ScriptContext1_IsScriptSetUp(void)
@@ -329,9 +329,9 @@ bool8 ScriptContext2_RunScript(void)
 
 void ScriptContext1_SetupScript(const u8 *ptr)
 {
-    sub_80699F8();
-    sub_80699C8();
-    sub_8069970();
+    ClearMsgBoxCancelableState();
+    EnableMsgBoxWalkaway();
+    ClearQuestLogInputIsDpadFlag();
     InitScriptContext(&sScriptContext1, gScriptCmdTable, gScriptCmdTableEnd);
     SetupBytecodeScript(&sScriptContext1, ptr);
     ScriptContext2_Enable();
@@ -358,7 +358,7 @@ void ScriptContext2_RunNewScript(const u8 *ptr)
 
 u8 *mapheader_get_tagged_pointer(u8 tag)
 {
-    u8 *mapScripts = gMapHeader.mapScripts;
+    const u8 *mapScripts = gMapHeader.mapScripts;
 
     if (mapScripts == NULL)
         return NULL;
@@ -370,7 +370,7 @@ u8 *mapheader_get_tagged_pointer(u8 tag)
         if (*mapScripts == tag)
         {
             mapScripts++;
-            return (u8 *)(mapScripts[0] + (mapScripts[1] << 8) + (mapScripts[2] << 16) + (mapScripts[3] << 24));
+            return T2_READ_PTR(mapScripts);
         }
         mapScripts += 5;
     }
@@ -379,7 +379,7 @@ u8 *mapheader_get_tagged_pointer(u8 tag)
 void mapheader_run_script_by_tag(u8 tag)
 {
     u8 *ptr = mapheader_get_tagged_pointer(tag);
-    if (ptr)
+    if (ptr != NULL)
         ScriptContext2_RunNewScript(ptr);
 }
 
@@ -387,7 +387,7 @@ u8 *mapheader_get_first_match_from_tagged_ptr_list(u8 tag)
 {
     u8 *ptr = mapheader_get_tagged_pointer(tag);
 
-    if (!ptr)
+    if (ptr == NULL)
         return NULL;
 
     while (1)
@@ -406,36 +406,36 @@ u8 *mapheader_get_first_match_from_tagged_ptr_list(u8 tag)
     }
 }
 
-void mapheader_run_script_with_tag_x1(void)
+void RunOnLoadMapScript(void)
 {
     mapheader_run_script_by_tag(1);
 }
 
-void mapheader_run_script_with_tag_x3(void)
+void RunOnTransitionMapScript(void)
 {
     mapheader_run_script_by_tag(3);
 }
 
-void mapheader_run_script_with_tag_x5(void)
+void RunOnResumeMapScript(void)
 {
     mapheader_run_script_by_tag(5);
 }
 
-void mapheader_run_script_with_tag_x7(void)
+void RunOnReturnToFieldMapScript(void)
 {
     mapheader_run_script_by_tag(7);
 }
 
-void mapheader_run_script_with_tag_x6(void)
+void RunOnDiveWarpMapScript(void)
 {
     mapheader_run_script_by_tag(6);
 }
 
-bool8 mapheader_run_first_tag2_script_list_match(void)
+bool8 TryRunOnFrameMapScript(void)
 {
     u8 *ptr;
 
-    if(gUnknown_203ADFA == 3)
+    if(gQuestLogState == QL_STATE_PLAYBACK_LAST)
         return 0;
 
     ptr = mapheader_get_first_match_from_tagged_ptr_list(2);
@@ -447,7 +447,7 @@ bool8 mapheader_run_first_tag2_script_list_match(void)
     return 1;
 }
 
-void mapheader_run_first_tag4_script_list_match(void)
+void TryRunOnWarpIntoMapScript(void)
 {
     u8 *ptr = mapheader_get_first_match_from_tagged_ptr_list(4);
     if (ptr)
@@ -482,10 +482,10 @@ bool8 InitRamScript(u8 *script, u16 scriptSize, u8 mapGroup, u8 mapNum, u8 objec
     return TRUE;
 }
 
-u8 *GetRamScript(u8 objectId, u8 *script)
+const u8 *GetRamScript(u8 objectId, const u8 *script)
 {
     struct RamScriptData *scriptData = &gSaveBlock1Ptr->ramScript.data;
-    gUnknown_20370A4 = NULL;
+    gRAMScriptPtr = NULL;
     if (scriptData->magic != RAM_SCRIPT_MAGIC)
         return script;
     if (scriptData->mapGroup != gSaveBlock1Ptr->location.mapGroup)
@@ -501,12 +501,12 @@ u8 *GetRamScript(u8 objectId, u8 *script)
     }
     else
     {
-        gUnknown_20370A4 = script;
+        gRAMScriptPtr = script;
         return scriptData->script;
     }
 }
 
-bool32 sub_8069DFC(void)
+bool32 ValidateRamScript(void)
 {
     struct RamScriptData *scriptData = &gSaveBlock1Ptr->ramScript.data;
     if (scriptData->magic != RAM_SCRIPT_MAGIC)
@@ -525,7 +525,7 @@ bool32 sub_8069DFC(void)
 u8 *sub_8069E48(void)
 {
     struct RamScriptData *scriptData = &gSaveBlock1Ptr->ramScript.data;
-    if (!sub_8143FC8())
+    if (!ValidateReceivedWonderCard())
         return NULL;
     if (scriptData->magic != RAM_SCRIPT_MAGIC)
         return NULL;
@@ -546,7 +546,7 @@ u8 *sub_8069E48(void)
     }
 }
 
-void sub_8069EA4(u8 *script, u16 scriptSize)
+void MEventSetRamScript(u8 *script, u16 scriptSize)
 {
     if (scriptSize > sizeof(gSaveBlock1Ptr->ramScript.data.script))
         scriptSize = sizeof(gSaveBlock1Ptr->ramScript.data.script);

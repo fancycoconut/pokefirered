@@ -1,7 +1,10 @@
 #include "global.h"
-#include "string_util.h"
-#include "text.h"
+#include "gflib.h"
 
+EWRAM_DATA u8 gStringVar1[32] = {};
+EWRAM_DATA u8 gStringVar2[20] = {};
+EWRAM_DATA u8 gStringVar3[20] = {};
+EWRAM_DATA u8 gStringVar4[1000] = {};
 EWRAM_DATA u8 gUnknownStringVar[16] = {0};
 
 static const u8 sDigits[] = __("0123456789ABCDEF");
@@ -401,37 +404,65 @@ static u8 *ExpandPlaceholder_RivalName(void)
 
 static u8 *ExpandPlaceholder_Version(void)
 {
+#if defined(FIRERED)
     return gExpandedPlaceholder_Ruby;
+#elif defined(LEAFGREEN)
+    return gExpandedPlaceholder_Sapphire;
+#endif
 }
 
 static u8 *ExpandPlaceholder_Magma(void)
 {
+#if defined(FIRERED)
     return gExpandedPlaceholder_Magma;
+#elif defined(LEAFGREEN)
+    return gExpandedPlaceholder_Aqua;
+#endif
 }
 
 static u8 *ExpandPlaceholder_Aqua(void)
 {
+#if defined(FIRERED)
     return gExpandedPlaceholder_Aqua;
+#elif defined(LEAFGREEN)
+    return gExpandedPlaceholder_Magma;
+#endif
 }
 
 static u8 *ExpandPlaceholder_Maxie(void)
 {
+#if defined(FIRERED)
     return gExpandedPlaceholder_Maxie;
+#elif defined(LEAFGREEN)
+    return gExpandedPlaceholder_Archie;
+#endif
 }
 
 static u8 *ExpandPlaceholder_Archie(void)
 {
+#if defined(FIRERED)
     return gExpandedPlaceholder_Archie;
+#elif defined(LEAFGREEN)
+    return gExpandedPlaceholder_Maxie;
+#endif
 }
 
 static u8 *ExpandPlaceholder_Groudon(void)
 {
+#if defined(FIRERED)
     return gExpandedPlaceholder_Groudon;
+#elif defined(LEAFGREEN)
+    return gExpandedPlaceholder_Kyogre;
+#endif
 }
 
 static u8 *ExpandPlaceholder_Kyogre(void)
 {
+#if defined(FIRERED)
     return gExpandedPlaceholder_Kyogre;
+#elif defined(LEAFGREEN)
+    return gExpandedPlaceholder_Groudon;
+#endif
 }
 
 u8 *GetExpandedPlaceholder(u32 id)
@@ -440,20 +471,20 @@ u8 *GetExpandedPlaceholder(u32 id)
 
     static const ExpandPlaceholderFunc funcs[] =
     {
-        ExpandPlaceholder_UnknownStringVar,
-        ExpandPlaceholder_PlayerName,
-        ExpandPlaceholder_StringVar1,
-        ExpandPlaceholder_StringVar2,
-        ExpandPlaceholder_StringVar3,
-        ExpandPlaceholder_KunChan,
-        ExpandPlaceholder_RivalName,
-        ExpandPlaceholder_Version,
-        ExpandPlaceholder_Magma,
-        ExpandPlaceholder_Aqua,
-        ExpandPlaceholder_Maxie,
-        ExpandPlaceholder_Archie,
-        ExpandPlaceholder_Groudon,
-        ExpandPlaceholder_Kyogre,
+        [PLACEHOLDER_ID_UNKNOWN]      = ExpandPlaceholder_UnknownStringVar,
+        [PLACEHOLDER_ID_PLAYER]       = ExpandPlaceholder_PlayerName,
+        [PLACEHOLDER_ID_STRING_VAR_1] = ExpandPlaceholder_StringVar1,
+        [PLACEHOLDER_ID_STRING_VAR_2] = ExpandPlaceholder_StringVar2,
+        [PLACEHOLDER_ID_STRING_VAR_3] = ExpandPlaceholder_StringVar3,
+        [PLACEHOLDER_ID_KUN]          = ExpandPlaceholder_KunChan,
+        [PLACEHOLDER_ID_RIVAL]        = ExpandPlaceholder_RivalName,
+        [PLACEHOLDER_ID_VERSION]      = ExpandPlaceholder_Version,
+        [PLACEHOLDER_ID_MAGMA]        = ExpandPlaceholder_Magma,
+        [PLACEHOLDER_ID_AQUA]         = ExpandPlaceholder_Aqua,
+        [PLACEHOLDER_ID_MAXIE]        = ExpandPlaceholder_Maxie,
+        [PLACEHOLDER_ID_ARCHIE]       = ExpandPlaceholder_Archie,
+        [PLACEHOLDER_ID_GROUDON]      = ExpandPlaceholder_Groudon,
+        [PLACEHOLDER_ID_KYOGRE]       = ExpandPlaceholder_Kyogre,
     };
 
     if (id >= ARRAY_COUNT(funcs))
@@ -500,11 +531,11 @@ u8 *StringFillWithTerminator(u8 *dest, u16 n)
     return StringFill(dest, EOS, n);
 }
 
-u8 *StringCopyN_Multibyte(u8 *dest, u8 *src, u32 n)
+u8 *StringCopyN_Multibyte(u8 *dest, const u8 *src, u32 n)
 {
     u32 i;
 
-    for (i = n - 1; i != (u32)-1; i--)
+    for (i = n - 1; i != -1u; i--)
     {
         if (*src == EOS)
         {
@@ -522,7 +553,7 @@ u8 *StringCopyN_Multibyte(u8 *dest, u8 *src, u32 n)
     return dest;
 }
 
-u32 StringLength_Multibyte(u8 *str)
+u32 StringLength_Multibyte(const u8 *str)
 {
     u32 length = 0;
 

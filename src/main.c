@@ -1,53 +1,22 @@
 #include "global.h"
-#include "main.h"
+#include "gflib.h"
+#include "link.h"
+#include "link_rfu.h"
+#include "load_save.h"
 #include "m4a.h"
 #include "random.h"
-#include "dma3.h"
 #include "gba/flash_internal.h"
-#include "battle.h"
+#include "help_system.h"
+#include "new_menu_helpers.h"
+#include "overworld.h"
+#include "play_time.h"
+#include "intro.h"
+#include "battle_controllers.h"
+#include "scanline_effect.h"
+#include "save_failed_screen.h"
+#include "quest_log.h"
 
-extern u16 GetGpuReg(u8);
-extern void SetGpuReg(u8, u16);
-extern void RFUVSync(void);
-extern void LinkVSync(void);
-extern void sub_80FCF34(void);
-extern void LinkVSync(void);
-extern void InitGpuRegManager(void);
-extern void InitRFU(void);
-extern void CheckForFlashMemory(void);
-extern void InitMapMusic(void);
-extern void ResetBgs(void);
-extern void SetDefaultFontsPointer(void);
-extern void InitHeap(void *heapStart, u32 heapSize); // malloc.h
-extern void rfu_REQ_stopMode(void);
-extern void rfu_waitREQComplete(void);
-extern bool32 sub_80582E0(void);
-extern bool32 sub_8058274(void);
-extern void ClearSpriteCopyRequests(void);
-extern void PlayTimeCounter_Update(void);
-extern void MapMusicMain(void);
-extern void EnableInterrupts(u16);
-extern void sub_800DD28(void);
-extern u16 SetFlashTimerIntr(u8 timerNum, void (**intrFunc)(void));
-extern void remove_some_task(void);
-extern void sub_80F50F4(void);
-extern bool32 sub_80F5118(void);
-extern bool8 sub_813B870(void);
-
-extern struct SoundInfo gSoundInfo;
-extern u32 gFlashMemoryPresent;
-extern u32 IntrMain[];
-extern u8 gHeap[];
-extern struct SaveBlock1 gSaveBlock1;
-extern struct SaveBlock2 gSaveBlock2;
-extern struct PokemonStorage gPokemonStorage;
-extern u32 gBattleTypeFlags;
-extern u8 gUnknown_03002748;
-extern u32 *gUnknown_0203CF5C;
-
-void Timer3Intr(void);
-bool8 HandleLinkConnection(void);
-void c2_copyright_1(void);
+extern u32 intr_main[];
 
 static void VBlankIntr(void);
 static void HBlankIntr(void);
@@ -55,11 +24,19 @@ static void VCountIntr(void);
 static void SerialIntr(void);
 static void IntrDummy(void);
 
-const u8 gGameVersion = VERSION_FIRE_RED;
+const u8 gGameVersion = GAME_VERSION;
 
 const u8 gGameLanguage = GAME_LANGUAGE;
 
+#if MODERN
+const char BuildDateTime[] = __DATE__ " " __TIME__;
+#else
+#if REVISION == 0
 const char BuildDateTime[] = "2004 04 26 11:20";
+#else
+const char BuildDateTime[] = "2004 07 20 09:30";
+#endif //REVISION
+#endif //MODERN
 
 const IntrFunc gIntrTableTemplate[] =
 {
@@ -96,12 +73,8 @@ u8 gUnknown_3003D84;
 
 static IntrFunc * const sTimerIntrFunc = gIntrTable + 0x7;
 
-extern u16 gTrainerId;
-extern bool8 gUnknown_3005ECC;
-extern bool8 gUnknown_3003F3C;
-extern bool8 gUnknown_3005E88;
-
-EWRAM_DATA void (**gFlashTimerIntrFunc)(void) = NULL;
+EWRAM_DATA u8 gDecompressionBuffer[0x4000] = {0};
+EWRAM_DATA u16 gTrainerId = 0;
 
 static void UpdateLinkAndCallCallbacks(void);
 static void InitMainCallbacks(void);
@@ -115,8 +88,38 @@ void EnableVCountIntrAtLine150(void);
 
 void AgbMain()
 {
+#if MODERN
+    // Modern compilers are liberal with the stack on entry to this function,
+    // so RegisterRamReset may crash if it resets IWRAM.
+    RegisterRamReset(RESET_ALL & ~RESET_IWRAM);
+    asm("mov\tr1, #0xC0\n"
+        "\tlsl\tr1, r1, #0x12\n"
+        "\tmov\tr2, #0xFC\n"
+        "\tlsl\tr2, r2, #0x7\n"
+        "\tadd\tr2, r1, r2\n"
+        "\tmov\tr0, #0\n"
+        "\tmov\tr3, r0\n"
+        "\tmov\tr4, r0\n"
+        "\tmov\tr5, r0\n"
+        ".LCU%=:\n"
+        "\tstmia\tr1!, {r0, r3, r4, r5}\n"
+        "\tstmia\tr1!, {r0, r3, r4, r5}\n"
+        "\tstmia\tr1!, {r0, r3, r4, r5}\n"
+        "\tstmia\tr1!, {r0, r3, r4, r5}\n"
+        "\tstmia\tr1!, {r0, r3, r4, r5}\n"
+        "\tstmia\tr1!, {r0, r3, r4, r5}\n"
+        "\tstmia\tr1!, {r0, r3, r4, r5}\n"
+        "\tstmia\tr1!, {r0, r3, r4, r5}\n"
+        "\tcmp\tr1, r2\n"
+        "\tbcc\t.LCU%=\n"
+        :
+        :
+        : "r0", "r1", "r2", "r3", "r4", "r5", "memory"
+    );
+#else
     RegisterRamReset(RESET_ALL);
-    *(vu16 *)BG_PLTT = 0x7FFF;
+#endif //MODERN
+    *(vu16 *)BG_PLTT = RGB_WHITE;
     InitGpuRegManager();
     REG_WAITCNT = WAITCNT_PREFETCH_ENABLE | WAITCNT_WS0_S_1 | WAITCNT_WS0_N_3;
     InitKeys();
@@ -129,13 +132,13 @@ void AgbMain()
     InitMapMusic();
     ClearDma3Requests();
     ResetBgs();
-    InitHeap(gHeap, 0x1C000);
+    InitHeap(gHeap, HEAP_SIZE);
     SetDefaultFontsPointer();
 
     gSoftResetDisabled = FALSE;
-    gUnknown_3005ECC = FALSE;
+    gHelpSystemEnabled = FALSE;
 
-    sub_80F50F4();
+    SetNotInSaveFailedScreen();
 
     AGBPrintInit();
 
@@ -159,7 +162,7 @@ void AgbMain()
             DoSoftReset();
         }
 
-        if (sub_80582E0() == 1)
+        if (Overworld_SendKeysToLinkIsRunning() == TRUE)
         {
             gLinkTransferringData = TRUE;
             UpdateLinkAndCallCallbacks();
@@ -170,7 +173,7 @@ void AgbMain()
             gLinkTransferringData = FALSE;
             UpdateLinkAndCallCallbacks();
 
-            if (sub_8058274() == 1)
+            if (Overworld_RecvKeysFromLinkIsRunning() == 1)
             {
                 gMain.newKeys = 0;
                 ClearSpriteCopyRequests();
@@ -201,12 +204,12 @@ static void InitMainCallbacks(void)
     gSaveBlock2Ptr = &gSaveBlock2;
     gSaveBlock1Ptr = &gSaveBlock1;
     gSaveBlock2.encryptionKey = 0;
-    gUnknown_3005E88 = FALSE;
+    gQuestLogPlaybackState = 0;
 }
 
 static void CallCallbacks(void)
 {
-    if (!sub_80F5118() && !sub_813B870())
+    if (!RunSaveFailedScreen() && !RunHelpSystemCallback())
     {
         if (gMain.callback1)
             gMain.callback1();
@@ -290,16 +293,16 @@ static void ReadKeys(void)
     gMain.heldKeys = gMain.heldKeysRaw;
 
     // Remap L to A if the L=A option is enabled.
-    if (gSaveBlock2Ptr->optionsButtonMode == 2)
+    if (gSaveBlock2Ptr->optionsButtonMode == OPTIONS_BUTTON_MODE_L_EQUALS_A)
     {
-        if (gMain.newKeys & L_BUTTON)
+        if (JOY_NEW(L_BUTTON))
             gMain.newKeys |= A_BUTTON;
 
-        if (gMain.heldKeys & L_BUTTON)
+        if (JOY_HELD(L_BUTTON))
             gMain.heldKeys |= A_BUTTON;
     }
 
-    if (gMain.newKeys & gMain.watchedKeysMask)
+    if (JOY_NEW(gMain.watchedKeysMask))
         gMain.watchedKeysPressed = TRUE;
 }
 
@@ -310,7 +313,7 @@ void InitIntrHandlers(void)
     for (i = 0; i < INTR_COUNT; i++)
         gIntrTable[i] = gIntrTableTemplate[i];
 
-    DmaCopy32(3, IntrMain, IntrMain_Buffer, sizeof(IntrMain_Buffer));
+    DmaCopy32(3, intr_main, IntrMain_Buffer, sizeof(IntrMain_Buffer));
 
     INTR_VECTOR = IntrMain_Buffer;
 
@@ -320,7 +323,7 @@ void InitIntrHandlers(void)
 
     REG_IME = 1;
 
-    EnableInterrupts(0x1);
+    EnableInterrupts(INTR_FLAG_VBLANK);
 }
 
 void SetVBlankCallback(IntrCallback callback)
@@ -348,7 +351,7 @@ extern void ProcessDma3Requests(void);
 
 static void VBlankIntr(void)
 {
-    if (gUnknown_3003F3C)
+    if (gWirelessCommType)
         RFUVSync();
     else if (!gLinkVSyncDisabled)
         LinkVSync();
@@ -372,7 +375,7 @@ static void VBlankIntr(void)
 
     sub_800DD28();
     Random();
-    sub_80FCF34();
+    UpdateWirelessStatusIndicatorSprite();
 
     INTR_CHECK |= INTR_FLAG_VBLANK;
     gMain.intrCheck |= INTR_FLAG_VBLANK;
@@ -441,7 +444,7 @@ void DoSoftReset(void)
 {
     REG_IME = 0;
     m4aSoundVSyncOff();
-    remove_some_task();
+    ScanlineEffect_Stop();
     DmaStop(1);
     DmaStop(2);
     DmaStop(3);

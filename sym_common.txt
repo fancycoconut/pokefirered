@@ -1,372 +1,82 @@
+	.align 2
 	.include "main.o"
+	.align 2
 	.include "bg.o"
+	.align 2
 	.include "text_printer.o"
+	.align 2
 	.include "window.o"
+	.align 2
 	.include "text.o"
+	.align 2
 	.include "sprite.o"
-
+	.align 2
+	.include "link.o"
 	.align 4
-gUnknown_3003E60: @ 3003E60
-	.space 0xC
-
-gUnknown_3003E6C: @ 3003E6C
-	.space 0x4
-
-gUnknown_3003E70: @ 3003E70
-	.space 0x3C
-
-gUnknown_3003EAC: @ 3003EAC
-	.space 0x4
-
-gUnknown_3003EB0: @ 3003EB0
-	.space 0x8
-
-gUnknown_3003EB8: @ 3003EB8
-	.space 0x4
-
-gUnknown_3003EBC: @ 3003EBC
-	.space 0x8
-
-gUnknown_3003EC4: @ 3003EC4
-	.space 0xC
-
-gUnknown_3003ED0: @ 3003ED0
-	.space 0x2
-
-gUnknown_3003ED2: @ 3003ED2
-	.space 0x2
-
-gUnknown_3003ED4: @ 3003ED4
-	.space 0x4C
-
-gUnknown_3003F20: @ 3003F20
-	.space 0x4
-
-gUnknown_3003F24: @ 3003F24
-	.space 0x4
-
-gUnknown_3003F28: @ 3003F28
-	.space 0x4
-
-gUnknown_3003F2C: @ 3003F2C
-	.space 0x4
-
-gUnknown_3003F30: @ 3003F30
-	.space 0x4
-
-gUnknown_3003F34: @ 3003F34
-	.space 0x4
-
-gUnknown_3003F38: @ 3003F38
-	.space 0x4
-
-gUnknown_3003F3C: @ 3003F3C
-	.space 0x4
-
-gUnknown_3003F40: @ 3003F40
-	.space 0x10
-
-gUnknown_3003F50: @ 3003F50
-	.space 0x10
-
-gUnknown_3003F60: @ 3003F60
-	.space 0x4
-
-gUnknown_3003F64: @ 3003F64
-	.space 0xC
-
-gUnknown_3003F70: @ 3003F70
-	.space 0x10
-
-gUnknown_3003F80: @ 3003F80
-	.space 0x4
-
-gUnknown_3003F84: @ 3003F84
-	.space 0x4
-
-gUnknown_3003F88: @ 3003F88
-	.space 0x8
-
-gUnknown_3003F90: @ 3003F90
-	.space 0x10
-
-gUnknown_3003FA0: @ 3003FA0
-	.space 0x10
-
-gUnknown_3003FB0: @ 3003FB0
-	.space 0x4
-
-gUnknown_3003FB4: @ 3003FB4
-	.space 0xFBC
-
-gUnknown_3004F70: @ 3004F70
-	.space 0x4
-
-gUnknown_3004F74: @ 3004F74
-	.space 0xC
-
-gUnknown_3004F80: @ 3004F80
-	.space 0x4
-
-gUnknown_3004F84: @ 3004F84
-	.space 0xC
-
-gBattleResults: @ 3004F90
-	.space 0x44
-
-gUnknown_3004FD4: @ 3004FD4
-	.space 0xC
-
-gUnknown_3004FE0: @ 3004FE0
-	.space 0x10
-
-gUnknown_3004FF0: @ 3004FF0
-	.space 0x4
-
-gUnknown_3004FF4: @ 3004FF4
-	.space 0x4
-
-gUnknown_3004FF8: @ 3004FF8
-	.space 0x4
-
-gUnknown_3004FFC: @ 3004FFC
-	.space 0x4
-
+	.include "battle_main.o"
+	.align 2
 	.include "random.o"
+	.align 2
 	.include "load_save.o"
-
 	.align 2
-gUnknown_3005014: @ 3005014
-	.space 0x4
-
-gUnknown_3005018: @ 3005018
-	.space 0x4
-
-gUnknown_300501C: @ 300501C
-	.space 0x4
-
-gUnknown_3005020: @ 3005020
-	.space 0x4
-
-gUnknown_3005024: @ 3005024
-	.space 0x4
-
-gUnknown_3005028: @ 3005028
-	.space 0x4
-
-gUnknown_300502C: @ 300502C
-	.space 0x4
-
-gUnknown_3005030: @ 3005030
-	.space 0x10
-
-gUnknown_3005040: @ 3005040
-	.space 0x10
-
-gUnknown_3005050: @ 3005050
-	.space 0x18
-
-gUnknown_3005068: @ 3005068
-	.space 0x4
-
-gUnknown_300506C: @ 300506C
-	.space 0x4
-
-gUnknown_3005070: @ 3005070
-	.space 0x4
-
-gUnknown_3005074: @ 3005074
-	.space 0x4
-
-gUnknown_3005078: @ 3005078
-	.space 0x4
-
-gUnknown_300507C: @ 300507C
-	.space 0x4
-
+	.include "overworld.o"
+	.align 4
+	.include "fieldmap.o"
+	.align 4
+	.include "field_camera.o"
+	.align 2
+	.include "scrcmd.o"
+	.align 2
+	.include "field_control_avatar.o"
+	.align 2
+	.include "event_data.o"
+	.align 2
 	.include "sound.o"
-	.include "task.o"
-	
-	@ what is this?
-	.space 0x20
-
-gUnknown_3005330: @ 3005330
-	.space 0x4
-
-gUnknown_3005334: @ 3005334
-	.space 0x4
-
-gUnknown_3005338: @ 3005338
-	.space 0x4
-
-gUnknown_300533C: @ 300533C
-	.space 0x4
-
-gUnknown_3005340: @ 3005340
-	.space 0x4
-
-gUnknown_3005344: @ 3005344
-	.space 0x4
-
-gUnknown_3005348: @ 3005348
-	.space 0x4
-
-gUnknown_300534C: @ 300534C
-	.space 0x4
-
-gUnknown_3005350: @ 3005350
-	.space 0x4
-
-gUnknown_3005354: @ 3005354
-	.space 0xC
-
-gUnknown_3005360: @ 3005360
-	.space 0x18
-
-gUnknown_3005378: @ 3005378
-	.space 0x4
-
-gUnknown_300537C: @ 300537C
-	.space 0x4
-
-	.include "save.o"
-
 	.align 2
-gUnknown_3005424: @ 3005424
-	.space 0x4
-
-gUnknown_3005428: @ 3005428
-	.space 0x4
-
-gUnknown_300542C: @ 300542C
-	.space 0x4
-
-gUnknown_3005430: @ 3005430
-	.space 0x10
-
-gUnknown_3005440: @ 3005440
-	.space 0x10
-
-gUnknown_3005450: @ 3005450
-	.space 0x14
-
-gUnknown_3005464: @ 3005464
-	.space 0x58
-
-gUnknown_30054BC: @ 30054BC
-	.space 0x2
-
-gUnknown_30054BE: @ 30054BE
-	.space 0x76
-
-gUnknown_3005534: @ 3005534
-	.space 0xE
-
-gUnknown_3005542: @ 3005542
-	.space 0x18
-
-gUnknown_300555A: @ 300555A
-	.space 0x1A
-
-gUnknown_3005574: @ 3005574
-	.space 0x57C
-
-gUnknown_3005AF0: @ 3005AF0
-	.space 0x29F
-
-gUnknown_3005D8F: @ 3005D8F
-	.space 0x47
-
-gUnknown_3005DD6: @ 3005DD6
-	.space 0x3
-
-gUnknown_3005DD9: @ 3005DD9
-	.space 0x4
-
-gUnknown_3005DDD: @ 3005DDD
-	.space 0x9
-
-gUnknown_3005DE6: @ 3005DE6
-	.space 0x1A
-
-gUnknown_3005E00: @ 3005E00
-	.space 0x10
-
-gUnknown_3005E10: @ 3005E10
-	.space 0x10
-
-gUnknown_3005E20: @ 3005E20
-	.space 0x40
-
-gUnknown_3005E60: @ 3005E60
-	.space 0x10
-
-gUnknown_3005E70: @ 3005E70
-	.space 0x18
-
+	.include "task.o"
+	.align 2
+	.include "cable_club.o"
+	.align 2
+	.include "image_processing_effects.o"
+	.align 2
+	.include "field_specials.o"
+	.align 2
+	.include "evolution_scene.o"
+	.align 2
+	.include "save.o"
+	.align 2
+	.include "battle_anim_special.o"
+	.align 2
+	.include "save_failed_screen.o"
+	.align 4
+	.include "link_rfu_2.o"
+	.align 4
+	.include "AgbRfu_LinkManager.o"
+	.align 4
+	.include "list_menu.o"
+	.align 2
 	.include "quest_log.o"
-
-gUnknown_3005E8C: @ 3005E8C
-	.space 0x4
-
-gUnknown_3005E90: @ 3005E90
-	.space 0x4
-
-gUnknown_3005E94: @ 3005E94
-	.space 0x4
-
-gUnknown_3005E98: @ 3005E98
-	.space 0x4
-
-gUnknown_3005E9C: @ 3005E9C
-	.space 0x4
-
-gUnknown_3005EA0: @ 3005EA0
-	.space 0x10
-
+	.align 2
+	.include "party_menu.o"
+	.align 2
+	.include "help_system_812B1E0.o"
+	.align 4
 	.include "fame_checker.o"
-
-gUnknown_3005ECC: @ 3005ECC
-	.space 0x4
-
-gUnknown_3005ED0: @ 3005ED0
-	.space 0x10
-
-gUnknown_3005EE0: @ 3005EE0
-	.space 0x10
-
-gUnknown_3005EF0: @ 3005EF0
-	.space 0x4
-
-gUnknown_3005EF4: @ 3005EF4
-	.space 0x4
-
-gUnknown_3005EF8: @ 3005EF8
-	.space 0x8
-
-gUnknown_3005F00: @ 3005F00
-	.space 0x50
-
-	.include "m4a_2.o"
+	.align 2
+	.include "help_system.o"
+	.align 4
+	.include "mevent.o"
+	.align 4
+	.include "battle_controller_pokedude.o"
+	.align 4
+	.include "berry_fix_program.o"
+	.align 2
+	.include "m4a.o"
+	.align 2
 	.include "agb_flash.o"
-
-gRfuState: @ 3007438
-	.space 0x8
-
-gUnknown_3007440: @ 3007440
-	.space 0x10
-
-gUnknown_3007450: @ 3007450
-	.space 0x10
-
-gUnknown_3007460: @ 3007460
-	.space 0x4
-
-gUnknown_3007464: @ 3007464
-	.space 0x4
-
-gUnknown_3007468: @ 3007468
-	.space 0x8
-
-gUnknown_3007470: @ 3007470
-	.space 0xC
+	.align 2
+	.include "librfu_stwi.o"
+	.align 4
+	.include "librfu_rfu.o"
+	.align 4
+	.include "librfu_sio32id.o"

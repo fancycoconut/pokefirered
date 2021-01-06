@@ -1,5 +1,4 @@
 #include "global.h"
-#include "gpu_regs.h"
 
 #define GPU_REG_BUF_SIZE 0x60
 
@@ -10,9 +9,9 @@
 
 static u8 sGpuRegBuffer[GPU_REG_BUF_SIZE];
 static u8 sGpuRegWaitingList[GPU_REG_BUF_SIZE];
-static bool8 sGpuRegBufferLocked;
-static bool8 sShouldSyncRegIE;
-static u16 sRegIE;
+static volatile bool8 sGpuRegBufferLocked;
+static volatile bool8 sShouldSyncRegIE;
+static vu16 sRegIE;
 
 static void CopyBufferedValueToGpuReg(u8 regOffset);
 static void SyncRegIE(void);

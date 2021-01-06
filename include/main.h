@@ -1,13 +1,13 @@
 #ifndef GUARD_MAIN_H
 #define GUARD_MAIN_H
 
-#include "global.h"
-
-#include "global.h"
-
 typedef void (*MainCallback)(void);
 typedef void (*IntrCallback)(void);
 typedef void (*IntrFunc)(void);
+
+#include "global.h"
+
+extern IntrFunc gIntrTable[];
 
 struct Main
 {
@@ -62,5 +62,17 @@ void SetSerialCallback(IntrCallback callback);
 void InitFlashTimer(void);
 void DoSoftReset(void);
 void ClearPokemonCrySongs(void);
+void RestoreSerialTimer3IntrHandlers(void);
+void SetVBlankCounter1Ptr(u32 *ptr);
+void DisableVBlankCounter1(void);
+void StartTimer1(void);
+void SeedRngAndSetTrainerId(void);
+u16 GetGeneratedTrainerIdLower(void);
+
+extern const char RomHeaderGameCode[4];
+extern const char RomHeaderSoftwareVersion;
+
+extern u8 gLinkTransferringData;
+extern u16 gKeyRepeatStartDelay;
 
 #endif // GUARD_MAIN_H

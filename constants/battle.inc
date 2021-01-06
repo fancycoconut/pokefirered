@@ -40,10 +40,10 @@
 .equiv TARGET, 0
 .equiv USER, 1
 
-.equiv WEATHER_SUN, 0
-.equiv WEATHER_RAIN, 1
-.equiv WEATHER_SANDSTORM, 2
-.equiv WEATHER_HAIL, 3
+.equiv BATTLE_WEATHER_SUNNY, 0
+.equiv BATTLE_WEATHER_RAIN, 1
+.equiv BATTLE_WEATHER_SANDSTORM, 2
+.equiv BATTLE_WEATHER_HAIL, 3
 
 	enum_start 1
 	enum ATTACK
@@ -71,7 +71,7 @@
 .equiv B_ANIM_STATS_CHANGE,            0x1
 .equiv B_ANIM_SUBSTITUTE_FADE,         0x2
 .equiv B_ANIM_SUBSTITUTE_APPEAR,       0x3
-.equiv B_ANIM_POKEBLOCK_THROW,         0x4
+.equiv B_ANIM_BAIT_THROW,         0x4
 .equiv B_ANIM_ITEM_KNOCKOFF,           0x5
 .equiv B_ANIM_TURN_TRAP,               0x6
 .equiv B_ANIM_ITEM_EFFECT,             0x7

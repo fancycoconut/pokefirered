@@ -1,7 +1,5 @@
 #include "global.h"
-#include "sprite.h"
-#include "main.h"
-#include "palette.h"
+#include "gflib.h"
 
 #define MAX_SPRITE_COPY_REQUESTS 64
 
@@ -94,17 +92,17 @@ typedef void (*AffineAnimCmdFunc)(u8 matrixNum, struct Sprite *);
 #define DUMMY_OAM_DATA        \
 {                             \
     160, /* Y (off-screen) */ \
-    0,                        \
-    0,                        \
-    0,                        \
-    0,                        \
-    0,                        \
+    ST_OAM_AFFINE_OFF,        \
+    ST_OAM_OBJ_NORMAL,        \
+    FALSE,                    \
+    ST_OAM_4BPP,              \
+    ST_OAM_SQUARE,            \
     304, /* X */              \
     0,                        \
-    0,                        \
-    0,                        \
+    ST_OAM_SIZE_0,            \
+    0x000,                    \
     3, /* lowest priority */  \
-    0,                        \
+    0x0,                      \
     0                         \
 }
 
@@ -250,33 +248,47 @@ static const AffineAnimCmdFunc sAffineAnimCmdFuncs[] =
     AffineAnimCmd_frame,
 };
 
-static const s32 gUnknown_082EC6F4[24] =
+static const s32 sOamDimensionsCopy[3][4][2] =
 {
-    8,      8,      0x10,   0x10,   0x20,   0x20,
-    0x40,   0x40,   0x10,   8,      0x20,   8,
-    0x20,   0x10,   0x40,   0x20,   8,      0x10,
-    8,      0x20,   0x10,   0x20,   0x20,   0x40,
+    [ST_OAM_SQUARE] = {
+        [ST_OAM_SIZE_0] = { 8,  8}, // SPRITE_SIZE_8x8
+        [ST_OAM_SIZE_1] = {16, 16}, // SPRITE_SIZE_16x16
+        [ST_OAM_SIZE_2] = {32, 32}, // SPRITE_SIZE_32x32
+        [ST_OAM_SIZE_3] = {64, 64}, // SPRITE_SIZE_64x64
+    },
+    [ST_OAM_H_RECTANGLE] = {
+        [ST_OAM_SIZE_0] = {16,  8}, // SPRITE_SIZE_16x8
+        [ST_OAM_SIZE_1] = {32,  8}, // SPRITE_SIZE_32x8
+        [ST_OAM_SIZE_2] = {32, 16}, // SPRITE_SIZE_32x16
+        [ST_OAM_SIZE_3] = {64, 32}, // SPRITE_SIZE_64x32
+    },
+    [ST_OAM_V_RECTANGLE] = {
+        [ST_OAM_SIZE_0] = { 8, 16}, // SPRITE_SIZE_8x16
+        [ST_OAM_SIZE_1] = { 8, 32}, // SPRITE_SIZE_8x32
+        [ST_OAM_SIZE_2] = {16, 32}, // SPRITE_SIZE_16x32
+        [ST_OAM_SIZE_3] = {32, 64}, // SPRITE_SIZE_32x64
+    },
 };
 
 static const struct OamDimensions sOamDimensions[3][4] =
 {
-    {   // square
-        {  8,  8 },
-        { 16, 16 },
-        { 32, 32 },
-        { 64, 64 },
+    [ST_OAM_SQUARE] = {
+        [ST_OAM_SIZE_0] = { 8,  8}, // SPRITE_SIZE_8x8
+        [ST_OAM_SIZE_1] = {16, 16}, // SPRITE_SIZE_16x16
+        [ST_OAM_SIZE_2] = {32, 32}, // SPRITE_SIZE_32x32
+        [ST_OAM_SIZE_3] = {64, 64}, // SPRITE_SIZE_64x64
     },
-    {   // horizontal rectangle
-        { 16,  8 },
-        { 32,  8 },
-        { 32, 16 },
-        { 64, 32 },
+    [ST_OAM_H_RECTANGLE] = {
+        [ST_OAM_SIZE_0] = {16,  8}, // SPRITE_SIZE_16x8
+        [ST_OAM_SIZE_1] = {32,  8}, // SPRITE_SIZE_32x8
+        [ST_OAM_SIZE_2] = {32, 16}, // SPRITE_SIZE_32x16
+        [ST_OAM_SIZE_3] = {64, 32}, // SPRITE_SIZE_64x32
     },
-    {   // vertical rectangle
-        {  8, 16 },
-        {  8, 32 },
-        { 16, 32 },
-        { 32, 64 },
+    [ST_OAM_V_RECTANGLE] = {
+        [ST_OAM_SIZE_0] = { 8, 16}, // SPRITE_SIZE_8x16
+        [ST_OAM_SIZE_1] = { 8, 32}, // SPRITE_SIZE_8x32
+        [ST_OAM_SIZE_2] = {16, 32}, // SPRITE_SIZE_16x32
+        [ST_OAM_SIZE_3] = {32, 64}, // SPRITE_SIZE_32x64
     },
 };
 
@@ -1208,125 +1220,45 @@ u8 GetSpriteMatrixNum(struct Sprite *sprite)
     return matrixNum;
 }
 
-void sub_8007FFC(struct Sprite* sprite, s16 a2, s16 a3)
+void obj_pos2_update_enable(struct Sprite* sprite, s16 xmod, s16 ymod)
 {
-    sprite->data[6] = a2;
-    sprite->data[7] = a3;
+    sprite->data[6] = xmod;
+    sprite->data[7] = ymod;
     sprite->flags_f = 1;
 }
 
-s32 sub_800800C(s32 a0, s32 a1, s32 a2)
+static s32 affine_get_new_pos2(s32 baseDim, s32 xformed, s32 modifier)
 {
-    s32 subResult, var1;
+    s32 subResult, shiftResult;
 
-    subResult = a1 - a0;
+    subResult = xformed - baseDim;
     if (subResult < 0)
-        var1 = -(subResult) >> 9;
+        shiftResult = -(subResult) >> 9;
     else
-        var1 = -(subResult >> 9);
-    return a2 - ((u32)(a2 * a1) / (u32)(a0) + var1);
+        shiftResult = -(subResult >> 9);
+    return modifier - ((u32)(modifier * xformed) / (u32)(baseDim) + shiftResult);
 }
 
-#ifdef NONMATCHING
-void obj_update_pos2(struct Sprite* sprite, s32 a1, s32 a2)
+static void obj_update_pos2(struct Sprite *sprite, s32 xmod, s32 ymod)
 {
-    s32 var0, var1, var2;
-    u8 matrixNum = sprite->oam.matrixNum;
-    if (a1 != 0x800)
+    s32 dim, baseDim, xFormed;
+
+    u32 matrixNum = sprite->oam.matrixNum;
+    if (xmod != 0x800)
     {
-        var0 = gUnknown_082EC6F4[sprite->oam.size * 8 + sprite->oam.shape * 32];
-        var1 = var0 << 8;
-        var2 = (var0 << 16) / gOamMatrices[matrixNum].a;
-        sprite->pos2.x = sub_800800C(var1, var2, a1);
+        dim = sOamDimensionsCopy[sprite->oam.shape][sprite->oam.size][0];
+        baseDim = dim << 8;
+        xFormed = (dim << 16) / gOamMatrices[matrixNum].a;
+        sprite->pos2.x = affine_get_new_pos2(baseDim, xFormed, xmod);
     }
-    if (a2 != 0x800)
+    if (ymod != 0x800)
     {
-        var0 = gUnknown_082EC6F4[4 + (sprite->oam.size * 8 + sprite->oam.shape * 32)];
-        var1 = var0 << 8;
-        var2 = (var0 << 16) / gOamMatrices[matrixNum].d;
-        sprite->pos2.y = sub_800800C(var1, var2, a2);
+        dim = sOamDimensionsCopy[sprite->oam.shape][sprite->oam.size][1];
+        baseDim = dim << 8;
+        xFormed = (dim << 16) / gOamMatrices[matrixNum].d;
+        sprite->pos2.y = affine_get_new_pos2(baseDim, xFormed, ymod);
     }
 }
-#else
-__attribute__((naked))
-void obj_update_pos2(struct Sprite* sprite, s32 a1, s32 a2)
-{
-    asm(".syntax unified\n\
-	push {r4-r7,lr}\n\
-	mov r7, r9\n\
-	mov r6, r8\n\
-	push {r6,r7}\n\
-	adds r5, r0, 0\n\
-	adds r6, r1, 0\n\
-	mov r8, r2\n\
-	ldrb r1, [r5, 0x3]\n\
-	lsls r0, r1, 26\n\
-	lsrs r7, r0, 27\n\
-	movs r0, 0x80\n\
-	lsls r0, 4\n\
-	mov r9, r0\n\
-	cmp r6, r9\n\
-	beq _08007EA2\n\
-	ldr r2, =gUnknown_082EC6F4\n\
-	lsrs r1, 6\n\
-	lsls r1, 3\n\
-	ldrb r0, [r5, 0x1]\n\
-	lsrs r0, 6\n\
-	lsls r0, 5\n\
-	adds r1, r0\n\
-	adds r1, r2\n\
-	ldr r0, [r1]\n\
-	lsls r4, r0, 8\n\
-	lsls r0, 16\n\
-	ldr r2, =gOamMatrices\n\
-	lsls r1, r7, 3\n\
-	adds r1, r2\n\
-	movs r2, 0\n\
-	ldrsh r1, [r1, r2]\n\
-	bl __divsi3\n\
-	adds r1, r0, 0\n\
-	adds r0, r4, 0\n\
-	adds r2, r6, 0\n\
-	bl sub_800800C\n\
-	strh r0, [r5, 0x24]\n\
-_08007EA2:\n\
-	cmp r8, r9\n\
-	beq _08007EDA\n\
-	ldr r2, =gUnknown_082EC6F4\n\
-	ldrb r1, [r5, 0x3]\n\
-	lsrs r1, 6\n\
-	lsls r1, 3\n\
-	ldrb r0, [r5, 0x1]\n\
-	lsrs r0, 6\n\
-	lsls r0, 5\n\
-	adds r1, r0\n\
-	adds r2, 0x4\n\
-	adds r1, r2\n\
-	ldr r0, [r1]\n\
-	lsls r4, r0, 8\n\
-	lsls r0, 16\n\
-	ldr r2, =gOamMatrices\n\
-	lsls r1, r7, 3\n\
-	adds r1, r2\n\
-	movs r2, 0x6\n\
-	ldrsh r1, [r1, r2]\n\
-	bl __divsi3\n\
-	adds r1, r0, 0\n\
-	adds r0, r4, 0\n\
-	mov r2, r8\n\
-	bl sub_800800C\n\
-	strh r0, [r5, 0x26]\n\
-_08007EDA:\n\
-	pop {r3,r4}\n\
-	mov r8, r3\n\
-	mov r9, r4\n\
-	pop {r4-r7}\n\
-	pop {r0}\n\
-	bx r0\n\
-	.pool\n\
-        .syntax divided");
-}
-#endif // NONMATCHING
 
 void SetSpriteOamFlipBits(struct Sprite *sprite, u8 hFlip, u8 vFlip)
 {

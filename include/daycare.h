@@ -3,8 +3,6 @@
 
 #include "global.h"
 
-#define EGG_HATCH_LEVEL 5
-
 u8 *GetMonNick(struct Pokemon *mon, u8 *dest);
 u8 *GetBoxMonNick(struct BoxPokemon *mon, u8 *dest);
 u8 CountPokemonInDaycare(struct DayCare *daycare);
@@ -25,5 +23,12 @@ void SetDaycareCompatibilityString(void);
 bool8 NameHasGenderSymbol(const u8 *name, u8 genderRatio);
 void ShowDaycareLevelMenu(void);
 void ChooseSendDaycareMon(void);
+
+void ScriptHatchMon(void);
+bool8 sub_8071614(void);
+void EggHatch(void);
+u8 GetEggStepsToSubtract(void);
+u16 sub_80722E0(void);
+bool8 ShouldEggHatch(void);
 
 #endif // GUARD_DAYCARE_H

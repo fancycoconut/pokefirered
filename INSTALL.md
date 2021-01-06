@@ -1,58 +1,77 @@
-Install [devkitARM](https://devkitpro.org/wiki/Getting_Started) (if you are on **Windows 10**, [do this instead](#windows-10)).
+## Prerequisites
 
-Run the following commands (first, see [this](#macos) if you are on **macOS** or [this](#old-windows) if you are on **old Windows**):
+| Linux | macOS | Windows 10 (build 18917+) | Windows 10 (1709+) | Windows 8, 8.1, and 10 (1507, 1511, 1607, 1703)
+| ----- | ----- | ------------------------- | ------------------ | ---------------------------------------------------------
+| none | [Xcode Command Line Tools package][xcode] | [Windows Subsystem for Linux 2][wsl2] | [Windows Subsystem for Linux][wsl] | [Cygwin][cygwin]
 
-	export DEVKITPRO=/opt/devkitpro
-	echo "export DEVKITPRO=$DEVKITPRO" >> ~/.bashrc
-	export DEVKITARM=$DEVKITPRO/devkitARM
-	echo "export DEVKITARM=$DEVKITARM" >> ~/.bashrc
+[xcode]: https://developer.apple.com/library/archive/technotes/tn2339/_index.html#//apple_ref/doc/uid/DTS40014588-CH1-DOWNLOADING_COMMAND_LINE_TOOLS_IS_NOT_AVAILABLE_IN_XCODE_FOR_MACOS_10_9__HOW_CAN_I_INSTALL_THEM_ON_MY_MACHINE_
+[wsl2]: https://docs.microsoft.com/windows/wsl/wsl2-install
+[wsl]: https://docs.microsoft.com/windows/wsl/install-win10
+[cygwin]: https://cygwin.com/install.html
 
-	git clone https://github.com/pret/pokefirered
-	git clone https://github.com/pret/agbcc
+The [prerelease version of the Linux subsystem](https://docs.microsoft.com/windows/wsl/install-legacy) available in the 1607 and 1703 releases of Windows 10 is obsolete so consider uninstalling it.
 
-	cd agbcc
-	./build.sh
-	./install.sh ../pokefirered
+Make sure that the `build-essential`, `git`, and `libpng-dev` packages are installed. The `build-essential` package includes the `make`, `gcc-core`, and `g++` packages so they do not have to be obtained separately.
 
-	cd ../pokefirered
+In the case of Cygwin, [include](https://cygwin.com/cygwin-ug-net/setup-net.html#setup-packages) the `make`, `git`, `gcc-core`, `gcc-g++`, and `libpng-devel` packages.
+
+Install the **devkitARM** toolchain of [devkitPro](https://devkitpro.org/wiki/Getting_Started) and add its environment variables. For Windows versions without the Linux subsystem, the devkitPro [graphical installer](https://github.com/devkitPro/installer/releases) includes a preconfigured MSYS2 environment, thus the steps below are not required.
+
+    sudo (dkp-)pacman -S gba-dev
+    export DEVKITPRO=/opt/devkitpro
+    echo "export DEVKITPRO=$DEVKITPRO" >> ~/.bashrc
+    export DEVKITARM=$DEVKITPRO/devkitARM
+    echo "export DEVKITARM=$DEVKITARM" >> ~/.bashrc
+
+
+## Installation
+
+To set up the repository:
+
+    git clone https://github.com/pret/pokefirered
+    git clone https://github.com/pret/agbcc
+
+    cd ./agbcc
+    sh build.sh
+    sh install.sh ../pokefirered
+
+    cd ../pokefirered
 
 To build **pokefirered.gba**:
 
-	make -j$(nproc)
+    make -j$(nproc)
 
-If you have only changed `.c` or `.s` files, you can turn off the dependency scanning temporarily. Changes to any other files will be ignored, and the build will either fail or not reflect those changes.
+To confirm it matches the official ROM image while building, do this instead:
 
-	make -j$(nproc) NODEP=1
+    make compare -j$(nproc)
 
+If only `.c` or `.s` files were changed, turn off the dependency scanning temporarily. Changes to any other files will be ignored and the build will either fail or not reflect those changes.
 
-## macOS
+    make -j$(nproc) NODEP=1
 
-Run `xcode-select --install` in Terminal, then proceed by executing the commands.
+Convenient targets have been defined to build Pokémon LeafGreen and the 1.1 revisions of both games:
 
+    # LeafGreen 1.0
+    make -j$(nproc) leafgreen
+    # FireRed 1.1
+    make -j$(nproc) firered_rev1
+    # LeafGreen 1.1
+    make -j$(nproc) leafgreen_rev1
 
-## Old Windows
+To confirm these match the respective official ROM images, prefix `compare_` to each target name. For example:
 
-*For Windows 8.1 and earlier*
+    make -j$(nproc) compare_leafgreen
 
-Download and run the [Cygwin](https://www.cygwin.com/install.html) setup, leaving the default settings intact. At "Select Packages", set the view to "Full" and choose to install the following:
+**Note:** If the build command is not recognized on Linux, including the Linux environment used within Windows, run `nproc` and replace `$(nproc)` with the returned value (e.g.: `make -j4`). Because `nproc` is not available on macOS, the alternative is `sysctl -n hw.ncpu`.
 
-- `make`
-- `git`
-- `gcc-core`
-- `gcc-g++`
-- `libpng-devel`
+### Note for Mac users
 
-In the Cygwin command prompt, enter the commands.
+The BSD make that comes with Mac XCode can be buggy, so obtain GNU make and sed using [Homebrew](https://brew.sh):
 
-If the command for building pokefirered.gba does not work, run `nproc` and use that value instead of `$(nproc)` for `make`.
+    brew install make gnu-sed
 
+When compiling agbcc, substitute the `build.sh` line for
 
-## Windows 10
+    gsed 's/^make/gmake/g' build.sh | sh
 
-Install the [Windows Subsystem for Linux](https://docs.microsoft.com/windows/wsl/install-win10), then install [devkitARM](https://devkitpro.org/wiki/Getting_Started) inside the subsystem, and run the commands.
-
-## Important note for all users
-
-Until further notice, this repository is dependent on `baserom.gba`, which is a copy of Pokémon FireRed (U)(1.0) bearing the SHA1 sum `41cb23d8dccc8ebd7c649cd8fbb58eeace6e2fdc`.  If you attempt to build and get the following error or similar, it's because `baserom.gba` is missing.
-
-    No rule to make target 'build/firered/data/librfu_rodata.o', needed by 'pokefirered.elf'. Stop.
+Finally, use `gmake` instead of `make` to compile the ROM(s).

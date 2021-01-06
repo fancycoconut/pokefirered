@@ -3,12 +3,7 @@
 
 #include "global.h"
 
-// Exported type declarations
-
-// Exported RAM declarations
-
-// Exported ROM declarations
-void HideMapNamePopUpWindow(void);
-void sub_8098110(u8);
+void ShowMapNamePopup(bool32 palIntoFadedBuffer);
+void DismissMapNamePopup(void);
 
 #endif //GUARD_MAP_NAME_POPUP_H

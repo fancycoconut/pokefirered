@@ -4,6 +4,8 @@
 	.include "asm/macros/pokemon_data.inc"
 	.include "asm/macros/ec.inc"
 	.include "asm/macros/map.inc"
+	.include "asm/macros/m4a.inc"
+	.include "asm/macros/trainer_tower.inc"
 
 	.macro region_map_location x, y, width, height, name
 	.byte \x
@@ -64,10 +66,9 @@
 	.endm
 
 	.macro subsprite x, y, priority, tile_num_offset, size
-	.2byte \x
-	.2byte \y
+	.byte \x
+	.byte \y
 	.2byte ((\priority) << 14) | ((\tile_num_offset) << 4) | SPRITE_SIZE_\size
-	.2byte 0 @ padding
 	.endm
 
 	.macro obj_image_anim_frame pic_id, duration, flags = 0
@@ -119,6 +120,12 @@
 	.fill 4 @ padding
 	.endm
 
+	.macro overworld_frame ptr:req, width:req, height:req, frame:req
+	.4byte (\ptr + (\width * \height * \frame * 64) / 2)
+	.2byte (\width * \height * 64) / 2
+	.2byte 0 @ padding
+	.endm
+
 	.macro credits_entry number, text
 	.4byte \number
 	.4byte \text
@@ -146,4 +153,18 @@
 	.2byte GROUP_\map_name
 	.2byte MAP_\map_name
 	.space 2
+	.endm
+
+	.macro window_template bg, top, left, height, width, palno, baseBlock
+	.byte \bg, \top, \left, \height, \width, \palno
+	.2byte \baseBlock
+	.endm
+
+	.macro abspath relative
+	.if REVISION == 0
+	.ascii "C:/WORK/POKeFRLG/src/pm_lgfr_ose/source/"
+	.else
+	.ascii "C:/WORK/POKeFRLG/Src/pm_lgfr_ose/source/"
+	.endif
+	.asciz "\relative"
 	.endm

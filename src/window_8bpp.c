@@ -1,13 +1,8 @@
 #include "global.h"
-#include "window.h"
-#include "malloc.h"
-#include "bg.h"
+#include "gflib.h"
 
 EWRAM_DATA static struct Window* sWindowPtr = NULL;
 EWRAM_DATA static u16 sWindowSize = 0;
-
-extern void BlitBitmapRect4BitTo8Bit(struct Bitmap *src, struct Bitmap *dest, u16 srcX, u16 srcY, u16 destX, u16 destY, u16 width, u16 height, u8 colorKey, u8 paletteNum);
-extern void FillBitmapRect8Bit(struct Bitmap *surface, u16 x, u16 y, u16 width, u16 height, u8 fillValue);
 
 static u8 GetNumActiveWindowsOnBg8Bit(u8 bgId);
 
@@ -15,23 +10,23 @@ static void nullsub_9(void)
 {
 }
 
-u16 AddWindow8Bit(struct WindowTemplate *template)
+u16 AddWindow8Bit(const struct WindowTemplate *template)
 {
     u16 windowId;
     u8* memAddress;
     u8 bgLayer;
 
-    for (windowId = 0; windowId < 32; windowId++)
+    for (windowId = 0; windowId < WINDOWS_MAX; windowId++)
     {
-        if (gWindows[windowId].window.priority == 0xFF)
+        if (gWindows[windowId].window.bg == 0xFF)
             break;
     }
     if (windowId == WINDOWS_MAX)
         return 0xFF;
-    bgLayer = template->priority;
-    if (gWindowBgTilemapBuffers[bgLayer] == 0)
+    bgLayer = template->bg;
+    if (gWindowBgTilemapBuffers[bgLayer] == NULL)
     {
-        u16 attribute = GetBgAttribute(bgLayer, 8);
+        u16 attribute = GetBgAttribute(bgLayer, BG_ATTR_MAPSIZE);
         if (attribute != 0xFFFF)
         {
             s32 i;
@@ -83,7 +78,7 @@ void FillWindowPixelRect8Bit(u8 windowId, u8 fillValue, u16 x, u16 y, u16 width,
     FillBitmapRect8Bit(&pixelRect, x, y, width, height, fillValue);
 }
 
-void BlitBitmapRectToWindow4BitTo8Bit(u8 windowId, u8 *pixels, u16 srcX, u16 srcY, u16 srcWidth, int srcHeight, u16 destX, u16 destY, u16 rectWidth, u16 rectHeight, u8 paletteNum)
+void BlitBitmapRectToWindow4BitTo8Bit(u8 windowId, const u8 *pixels, u16 srcX, u16 srcY, u16 srcWidth, int srcHeight, u16 destX, u16 destY, u16 rectWidth, u16 rectHeight, u8 paletteNum)
 {
     struct Bitmap sourceRect;
     struct Bitmap destRect;
@@ -106,15 +101,15 @@ void CopyWindowToVram8Bit(u8 windowId, u8 mode)
 
     switch (mode)
     {
-        case 1:
-            CopyBgTilemapBufferToVram(sWindowPtr->window.priority);
+        case COPYWIN_MAP:
+            CopyBgTilemapBufferToVram(sWindowPtr->window.bg);
             break;
-        case 2:
-            LoadBgTiles(sWindowPtr->window.priority, sWindowPtr->tileData, sWindowSize, sWindowPtr->window.baseBlock);
+        case COPYWIN_GFX:
+            LoadBgTiles(sWindowPtr->window.bg, sWindowPtr->tileData, sWindowSize, sWindowPtr->window.baseBlock);
             break;
-        case 3:
-            LoadBgTiles(sWindowPtr->window.priority, sWindowPtr->tileData, sWindowSize, sWindowPtr->window.baseBlock);
-            CopyBgTilemapBufferToVram(sWindowPtr->window.priority);
+        case COPYWIN_BOTH:
+            LoadBgTiles(sWindowPtr->window.bg, sWindowPtr->tileData, sWindowSize, sWindowPtr->window.baseBlock);
+            CopyBgTilemapBufferToVram(sWindowPtr->window.bg);
             break;
     }
 }
@@ -125,7 +120,7 @@ static u8 GetNumActiveWindowsOnBg8Bit(u8 bgId)
     s32 i;
     for (i = 0; i < WINDOWS_MAX; i++)
     {
-        if (gWindows[i].window.priority == bgId)
+        if (gWindows[i].window.bg == bgId)
             windowsNum++;
     }
     return windowsNum;

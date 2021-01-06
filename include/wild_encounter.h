@@ -34,14 +34,18 @@ struct WildPokemonHeader
 extern const struct WildPokemonHeader gWildMonHeaders[];
 
 void DisableWildEncounters(bool8 disabled);
-bool8 StandardWildEncounter(u16 currMetaTileBehavior, u16 previousMetaTileBehavior);
-void ScrSpecial_RockSmashWildEncounter(void);
+bool8 StandardWildEncounter(u32 currMetaTileBehavior, u16 previousMetaTileBehavior);
 bool8 SweetScentWildEncounter(void);
 bool8 DoesCurrentMapHaveFishingMons(void);
 void FishingWildEncounter(u8 rod);
 u16 GetLocalWildMon(bool8 *isWaterMon);
 u16 GetLocalWaterMon(void);
 bool8 UpdateRepelCounter(void);
-void sub_8082740(u8);
+void DisableWildEncounters(bool8 state);
+u8 GetUnownLetterByPersonalityLoByte(u32 personality);
+bool8 SweetScentWildEncounter(void);
+void SeedWildEncounterRng(u16 randVal);
+void ResetEncounterRateModifiers(void);
+bool8 TryStandardWildEncounter(u32 currMetatileBehavior);
 
 #endif // GUARD_WILD_ENCOUNTER_H

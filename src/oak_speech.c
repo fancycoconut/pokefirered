@@ -15,7 +15,6 @@
 #include "overworld.h"
 #include "random.h"
 #include "data.h"
-#include "constants/species.h"
 #include "constants/songs.h"
 
 struct OakSpeechResources
@@ -535,7 +534,7 @@ static void Task_OaksSpeech1(u8 taskId)
     case 4:
         gPaletteFade.bufferTransferDisabled = TRUE;
         InitStandardTextBoxWindows();
-        ResetBg0();
+        InitTextBoxGfxAndPrinters();
         Menu_LoadStdPalAt(0xD0);
         LoadPalette(sHelpDocsPalette, 0x000, 0x080);
         LoadPalette(stdpal_get(2) + 15, 0x000, 0x002);
@@ -705,7 +704,7 @@ static void Task_OakSpeech5(u8 taskId)
         }
         FillBgTilemapBufferRect_Palette0(1, 0x000, 0, 2, 30, 18);
         CopyBgTilemapBufferToVram(1);
-        sub_8006398(gTasks[taskId].data[5]);
+        DestroyTextCursorSprite(gTasks[taskId].data[5]);
         sOakSpeechResources->unk_0014[0] = RGB_BLACK;
         LoadPalette(sOakSpeechResources->unk_0014, 0, 2);
         gTasks[taskId].data[3] = 32;
@@ -823,7 +822,7 @@ static void Task_OakSpeech7(u8 taskId)
         }
         break;
     case 4:
-        sub_8006398(gTasks[taskId].data[5]);
+        DestroyTextCursorSprite(gTasks[taskId].data[5]);
         PlayBGM(MUS_NEW_GAME_EXIT);
         data[15] = 24;
         gMain.state++;
@@ -1001,7 +1000,7 @@ static void Task_OakSpeech16(u8 taskId)
     {
         if (data[0] < 24)
         {
-            gSprites[data[4]].pos1.y--;
+            gSprites[data[4]].y--;
         }
         data[0]--;
     }
@@ -1419,8 +1418,8 @@ static void Task_OakSpeech39(u8 taskId)
             PlaySE(SE_WARP_IN);
         r0 = data[2];
         data[2] -= 32;
-        x = MathUtil_Inv16(r0 - 8);
-        y = MathUtil_Inv16(data[2] - 16);
+        x = Q_8_8_inv(r0 - 8);
+        y = Q_8_8_inv(data[2] - 16);
         SetBgAffine(2, 0x7800, 0x5400, 0x78, 0x54, x, y, 0);
         if (data[2] <= 96)
         {
@@ -1567,7 +1566,7 @@ static void CB2_ReturnFromNamingScreen(void)
     case 3:
         FreeAllWindowBuffers();
         InitStandardTextBoxWindows();
-        ResetBg0();
+        InitTextBoxGfxAndPrinters();
         LoadPalette(sHelpDocsPalette, 0, 0xe0);
         break;
     case 4:
@@ -1631,7 +1630,7 @@ static void CreateNidoranFSprite(u8 taskId)
 
 static void SpriteCB_PikaSync(struct Sprite * sprite)
 {
-    sprite->pos2.y = gSprites[sprite->data[0]].animCmdIndex;
+    sprite->y2 = gSprites[sprite->data[0]].animCmdIndex;
 }
 
 static void CreatePikaOrGrassPlatformSpriteAndLinkToCurrentTask(u8 taskId, u8 state)

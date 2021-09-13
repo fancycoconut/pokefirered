@@ -49,7 +49,7 @@
 #define BATTLE_TYPE_IS_MASTER        0x0004 // In not-link battles, it's always set.
 #define BATTLE_TYPE_TRAINER          0x0008
 #define BATTLE_TYPE_FIRST_BATTLE     0x0010
-#define BATTLE_TYPE_20               0x0020
+#define BATTLE_TYPE_LINK_ESTABLISHED 0x0020 // Set when the link battle setup callback finishes.
 #define BATTLE_TYPE_MULTI            0x0040
 #define BATTLE_TYPE_SAFARI           0x0080
 #define BATTLE_TYPE_BATTLE_TOWER     0x0100
@@ -172,7 +172,7 @@
 #define HITMARKER_IGNORE_UNDERGROUND    0x00020000
 #define HITMARKER_IGNORE_UNDERWATER     0x00040000
 #define HITMARKER_UNABLE_TO_USE_MOVE    0x00080000
-#define HITMARKER_x100000               0x00100000
+#define HITMARKER_PASSIVE_DAMAGE        0x00100000
 #define HITMARKER_x200000               0x00200000
 #define HITMARKER_PLAYER_FAINTED        0x00400000
 #define HITMARKER_x800000               0x00800000

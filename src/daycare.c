@@ -1,7 +1,7 @@
 #include "global.h"
 #include "gflib.h"
+#include "data.h"
 #include "battle.h"
-#include "constants/species.h"
 #include "constants/items.h"
 #include "mail_data.h"
 #include "pokemon_storage_system.h"
@@ -32,6 +32,8 @@
 
 // Combination of RSE's Day-Care (re-used on Four Island), FRLG's Day-Care, and egg_hatch.c
 
+extern const struct Evolution gEvolutionTable[][EVOS_PER_MON];
+
 struct EggHatchData
 {
     u8 eggSpriteID;
@@ -53,7 +55,7 @@ struct EggHatchData
 static void ClearDaycareMonMail(struct DayCareMail *mail);
 static void SetInitialEggData(struct Pokemon *mon, u16 species, struct DayCare *daycare);
 static u8 GetDaycareCompatibilityScore(struct DayCare *daycare);
-static void DaycarePrintMonInfo(u8 windowId, s32 daycareSlotId, u8 y);
+static void DaycarePrintMonInfo(u8 windowId, u32 daycareSlotId, u8 y);
 
 static void Task_EggHatch(u8 taskID);
 static void CB2_EggHatch_0(void);
@@ -791,7 +793,7 @@ static void InheritIVs(struct Pokemon *egg, struct DayCare *daycare)
     u8 i;
     u8 selectedIvs[INHERITED_IV_COUNT];
     u8 availableIVs[NUM_STATS];
-    u8 whichParent[ARRAY_COUNT(selectedIvs)];
+    u8 whichParent[NELEMS(selectedIvs)];
     u8 iv;
 
     // Initialize a list of IV indices.
@@ -801,7 +803,7 @@ static void InheritIVs(struct Pokemon *egg, struct DayCare *daycare)
     }
 
     // Select the 3 IVs that will be inherited.
-    for (i = 0; i < ARRAY_COUNT(selectedIvs); i++)
+    for (i = 0; i < NELEMS(selectedIvs); i++)
     {
         // Randomly pick an IV from the available list and stop from being chosen again.
         selectedIvs[i] = availableIVs[Random() % (NUM_STATS - i)];
@@ -809,13 +811,13 @@ static void InheritIVs(struct Pokemon *egg, struct DayCare *daycare)
     }
 
     // Determine which parent each of the selected IVs should inherit from.
-    for (i = 0; i < ARRAY_COUNT(selectedIvs); i++)
+    for (i = 0; i < NELEMS(selectedIvs); i++)
     {
         whichParent[i] = Random() % DAYCARE_MON_COUNT;
     }
 
     // Set each of inherited IVs on the egg mon.
-    for (i = 0; i < ARRAY_COUNT(selectedIvs); i++)
+    for (i = 0; i < NELEMS(selectedIvs); i++)
     {
         switch (selectedIvs[i])
         {
@@ -859,7 +861,7 @@ static u8 GetEggMoves(struct Pokemon *pokemon, u16 *eggMoves)
     numEggMoves = 0;
     eggMoveIdx = 0;
     species = GetMonData(pokemon, MON_DATA_SPECIES);
-    for (i = 0; i < ARRAY_COUNT(gEggMoves) - 1; i++)
+    for (i = 0; i < NELEMS(gEggMoves) - 1; i++)
     {
         if (gEggMoves[i] == species + EGG_MOVES_SPECIES_OFFSET)
         {
@@ -1146,8 +1148,8 @@ static bool8 TryProduceOrHatchEgg(struct DayCare *daycare)
     // Check if an egg should be produced
     if (daycare->offspringPersonality == 0 && validEggs == DAYCARE_MON_COUNT && (daycare->mons[1].steps & 0xFF) == 0xFF)
     {
-        u8 compatability = GetDaycareCompatibilityScore(daycare);
-        if (compatability > (Random() * 100u) / USHRT_MAX)
+        u8 compatibility = GetDaycareCompatibilityScore(daycare);
+        if (compatibility > (Random() * 100u) / USHRT_MAX)
             TriggerPendingDaycareEgg();
     }
 
@@ -1299,7 +1301,7 @@ static u8 GetDaycareCompatibilityScore(struct DayCare *daycare)
         if (trainerIds[0] == trainerIds[1])
             return PARENTS_LOW_COMPATIBILITY;
 
-        return PARENTS_MED_COMPATABILITY;
+        return PARENTS_MED_COMPATIBILITY;
     }
     // neither parent is Ditto
     else
@@ -1314,14 +1316,14 @@ static u8 GetDaycareCompatibilityScore(struct DayCare *daycare)
         if (species[0] == species[1])
         {
             if (trainerIds[0] == trainerIds[1])
-                return PARENTS_MED_COMPATABILITY; // same species, same trainer
+                return PARENTS_MED_COMPATIBILITY; // same species, same trainer
 
-            return PARENTS_MAX_COMPATABILITY; // same species, different trainers
+            return PARENTS_MAX_COMPATIBILITY; // same species, different trainers
         }
         else
         {
             if (trainerIds[0] != trainerIds[1])
-                return PARENTS_MED_COMPATABILITY; // different species, different trainers
+                return PARENTS_MED_COMPATIBILITY; // different species, different trainers
 
             return PARENTS_LOW_COMPATIBILITY; // different species, same trainer
         }
@@ -1344,9 +1346,9 @@ void SetDaycareCompatibilityString(void)
         whichString = 3;
     if (relationshipScore == PARENTS_LOW_COMPATIBILITY)
         whichString = 2;
-    if (relationshipScore == PARENTS_MED_COMPATABILITY)
+    if (relationshipScore == PARENTS_MED_COMPATIBILITY)
         whichString = 1;
-    if (relationshipScore == PARENTS_MAX_COMPATABILITY)
+    if (relationshipScore == PARENTS_MAX_COMPATIBILITY)
         whichString = 0;
 
     StringCopy(gStringVar4, sCompatibilityMessages[whichString]);
@@ -1481,7 +1483,7 @@ static void DaycarePrintMonLvl(struct DayCare *daycare, u8 windowId, u32 daycare
     DaycareAddTextPrinter(windowId, lvlText, x, y);
 }
 
-static void DaycarePrintMonInfo(u8 windowId, s32 daycareSlotId, u8 y)
+static void DaycarePrintMonInfo(u8 windowId, u32 daycareSlotId, u8 y)
 {
     if (daycareSlotId < (unsigned) DAYCARE_MON_COUNT)
     {
@@ -1592,7 +1594,7 @@ static void CreatedHatchedMon(struct Pokemon *egg, struct Pokemon *temp)
 {
     u16 species;
     u32 personality, pokerus;
-    u8 i, friendship, language, gameMet, markings, obedience;
+    u8 i, friendship, language, gameMet, markings, isEventLegal;
     u16 moves[4];
     u32 ivs[NUM_STATS];
 
@@ -1615,7 +1617,7 @@ static void CreatedHatchedMon(struct Pokemon *egg, struct Pokemon *temp)
     gameMet = GetMonData(egg, MON_DATA_MET_GAME);
     markings = GetMonData(egg, MON_DATA_MARKINGS);
     pokerus = GetMonData(egg, MON_DATA_POKERUS);
-    obedience = GetMonData(egg, MON_DATA_OBEDIENCE);
+    isEventLegal = GetMonData(egg, MON_DATA_EVENT_LEGAL);
 
     CreateMon(temp, species, EGG_HATCH_LEVEL, 32, TRUE, personality, 0, 0);
 
@@ -1637,7 +1639,7 @@ static void CreatedHatchedMon(struct Pokemon *egg, struct Pokemon *temp)
     friendship = 120;
     SetMonData(temp, MON_DATA_FRIENDSHIP, &friendship);
     SetMonData(temp, MON_DATA_POKERUS, &pokerus);
-    SetMonData(temp, MON_DATA_OBEDIENCE, &obedience);
+    SetMonData(temp, MON_DATA_EVENT_LEGAL, &isEventLegal);
 
     *egg = *temp;
 }
@@ -1683,13 +1685,13 @@ void ScriptHatchMon(void)
     AddHatchedMonToParty(gSpecialVar_0x8004);
 }
 
-static bool8 sub_8046E34(struct DayCare *daycare, u8 daycareId)
+static bool8 BufferDayCareMonReceivedMail(struct DayCare *daycare, u8 daycareId)
 {
     u8 nick[0x20];
     struct DaycareMon *daycareMon = &daycare->mons[daycareId];
 
     DayCare_GetBoxMonNickname(&daycareMon->mon, nick);
-    if (daycareMon->mail.message.itemId != 0
+    if (daycareMon->mail.message.itemId != ITEM_NONE
         && (StringCompare(nick, daycareMon->mail.monName) != 0
             || StringCompare(gSaveBlock2Ptr->playerName, daycareMon->mail.OT_name) != 0))
     {
@@ -1703,7 +1705,7 @@ static bool8 sub_8046E34(struct DayCare *daycare, u8 daycareId)
 
 bool8 DaycareMonReceivedMail(void)
 {
-    return sub_8046E34(&gSaveBlock1Ptr->daycare, gSpecialVar_0x8004);
+    return BufferDayCareMonReceivedMail(&gSaveBlock1Ptr->daycare, gSpecialVar_0x8004);
 }
 
 extern const struct CompressedSpriteSheet gMonFrontPicTable[];
@@ -1788,7 +1790,7 @@ static void CB2_EggHatch_0(void)
 
         ResetTempTileDataBuffers();
         ResetBgsAndClearDma3BusyFlags(0);
-        InitBgsFromTemplates(0, sBgTemplates_EggHatch, ARRAY_COUNT(sBgTemplates_EggHatch));
+        InitBgsFromTemplates(0, sBgTemplates_EggHatch, NELEMS(sBgTemplates_EggHatch));
 
         ChangeBgX(1, 0, 0);
         ChangeBgY(1, 0, 0);
@@ -1842,7 +1844,7 @@ static void CB2_EggHatch_0(void)
         SetGpuReg(REG_OFFSET_DISPCNT, DISPCNT_OBJ_ON | DISPCNT_OBJ_1D_MAP);
         LoadPalette(gTradeGba2_Pal, 0x10, 0xA0);
         LoadBgTiles(1, gTradeGba_Gfx, 0x1420, 0);
-        CopyToBgTilemapBuffer(1, gUnknown_826601C, 0x1000, 0);
+        CopyToBgTilemapBuffer(1, gTradeOrHatchMonShadowTilemap, 0x1000, 0);
         CopyBgTilemapBufferToVram(1);
         gMain.state++;
         break;
@@ -2008,7 +2010,7 @@ static void SpriteCB_Egg_0(struct Sprite* sprite)
     else
     {
         sprite->data[1] = (sprite->data[1] + 20) & 0xFF;
-        sprite->pos2.x = Sin(sprite->data[1], 1);
+        sprite->x2 = Sin(sprite->data[1], 1);
         if (sprite->data[0] == 15)
         {
             PlaySE(SE_BALL);
@@ -2031,7 +2033,7 @@ static void SpriteCB_Egg_1(struct Sprite* sprite)
         else
         {
             sprite->data[1] = (sprite->data[1] + 20) & 0xFF;
-            sprite->pos2.x = Sin(sprite->data[1], 2);
+            sprite->x2 = Sin(sprite->data[1], 2);
             if (sprite->data[0] == 15)
             {
                 PlaySE(SE_BALL);
@@ -2040,16 +2042,6 @@ static void SpriteCB_Egg_1(struct Sprite* sprite)
         }
     }
 }
-
-struct UnkStruct_82349CC
-{
-    u8 field_0;
-    u8 field_1;
-    u8 field_2;
-    u8 field_3;
-};
-
-extern const struct UnkStruct_82349CC gMonFrontPicCoords[NUM_SPECIES];
 
 static void SpriteCB_Egg_2(struct Sprite* sprite)
 {
@@ -2062,13 +2054,13 @@ static void SpriteCB_Egg_2(struct Sprite* sprite)
             sprite->callback = SpriteCB_Egg_3;
             sprite->data[0] = 0;
             species = GetMonData(&gPlayerParty[sEggHatchData->eggPartyID], MON_DATA_SPECIES);
-            gSprites[sEggHatchData->pokeSpriteID].pos2.x = 0;
-            gSprites[sEggHatchData->pokeSpriteID].pos2.y = gMonFrontPicCoords[species].field_1;
+            gSprites[sEggHatchData->pokeSpriteID].x2 = 0;
+            gSprites[sEggHatchData->pokeSpriteID].y2 = gMonFrontPicCoords[species].y_offset;
         }
         else
         {
             sprite->data[1] = (sprite->data[1] + 20) & 0xFF;
-            sprite->pos2.x = Sin(sprite->data[1], 2);
+            sprite->x2 = Sin(sprite->data[1], 2);
             if (sprite->data[0] == 15)
             {
                 PlaySE(SE_BALL);
@@ -2121,7 +2113,7 @@ static void SpriteCB_Egg_5(struct Sprite* sprite)
     if (sprite->data[0] == 8)
         BeginNormalPaletteFade(0xFFFFFFFF, -1, 0x10, 0, 0xFFFF);
     if (sprite->data[0] <= 9)
-        gSprites[sEggHatchData->pokeSpriteID].pos1.y -= 1;
+        gSprites[sEggHatchData->pokeSpriteID].y -= 1;
     if (sprite->data[0] > 40)
         sprite->callback = SpriteCallbackDummy;
     sprite->data[0]++;
@@ -2132,12 +2124,12 @@ static void SpriteCB_EggShard(struct Sprite* sprite)
     sprite->data[4] += sprite->data[1];
     sprite->data[5] += sprite->data[2];
 
-    sprite->pos2.x = sprite->data[4] / 256;
-    sprite->pos2.y = sprite->data[5] / 256;
+    sprite->x2 = sprite->data[4] / 256;
+    sprite->y2 = sprite->data[5] / 256;
 
     sprite->data[2] += sprite->data[3];
 
-    if (sprite->pos1.y + sprite->pos2.y > sprite->pos1.y + 20 && sprite->data[2] > 0)
+    if (sprite->y + sprite->y2 > sprite->y + 20 && sprite->data[2] > 0)
         DestroySprite(sprite);
 }
 

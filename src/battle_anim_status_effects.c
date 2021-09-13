@@ -43,7 +43,7 @@ const struct SpriteTemplate gSpriteTemplate_83BF3F8 =
     .anims = sSpriteAnimTable_83BF3F4,
     .images = NULL,
     .affineAnims = gDummySpriteAffineAnimTable,
-    .callback = sub_8076F58,
+    .callback = SpriteCB_AnimTranslateSpriteLinearAndFlicker2,
 };
 
 const struct SpriteTemplate gSpriteTemplate_83BF410 =
@@ -54,7 +54,7 @@ const struct SpriteTemplate gSpriteTemplate_83BF410 =
     .anims = sSpriteAnimTable_83BF3F4,
     .images = NULL,
     .affineAnims = gDummySpriteAffineAnimTable,
-    .callback = sub_8076ED8,
+    .callback = SpriteCB_AnimTranslateSpriteLinearAndFlicker,
 };
 
 static const union AnimCmd sUnknown_83BF428[] =
@@ -76,7 +76,7 @@ const struct SpriteTemplate gWeatherBallUpSpriteTemplate =
     .anims = sSpriteAnimTable_83BF430,
     .images = NULL,
     .affineAnims = gDummySpriteAffineAnimTable,
-    .callback = sub_807729C,
+    .callback = SpriteCB_WeatherBallUp,
 };
 
 const struct SpriteTemplate gWeatherBallNormalDownSpriteTemplate =
@@ -113,7 +113,7 @@ const struct SpriteTemplate gSpriteTemplate_83BF480 =
     .anims = sSpriteAnimTable_83BF47C,
     .images = NULL,
     .affineAnims = gDummySpriteAffineAnimTable,
-    .callback = sub_8076FD0,
+    .callback = SpriteCB_TrackOffsetFromAttackerAndWaitAnim,
 };
 
 const struct SpriteTemplate gSpriteTemplate_83BF498 =
@@ -124,7 +124,7 @@ const struct SpriteTemplate gSpriteTemplate_83BF498 =
     .anims = gDummySpriteAnimTable,
     .images = NULL,
     .affineAnims = gDummySpriteAffineAnimTable,
-    .callback = sub_8076F58,
+    .callback = SpriteCB_AnimTranslateSpriteLinearAndFlicker2,
 };
 
 static const union AnimCmd sUnknown_83BF4B0[] =
@@ -160,7 +160,7 @@ const struct SpriteTemplate gSpriteTemplate_83BF4D4 =
     .anims = sSpriteAniimTable_83BF4C8,
     .images = NULL,
     .affineAnims = gDummySpriteAffineAnimTable,
-    .callback = sub_8076F58,
+    .callback = SpriteCB_AnimTranslateSpriteLinearAndFlicker2,
 };
 
 static const union AnimCmd sUnknown_83BF4EC[] =
@@ -194,7 +194,7 @@ const struct SpriteTemplate gSpriteTemplate_83BF514 =
     .anims = sSpriteAnimTable_83BF4F4,
     .images = NULL,
     .affineAnims = sSpriteAffineAnimTable_83BF510,
-    .callback = sub_8076ED8,
+    .callback = SpriteCB_AnimTranslateSpriteLinearAndFlicker,
 };
 
 static const u8 sUnknown_83BF52C[] = _("TASK OVER\nタスクがオ-バ-しました");
@@ -250,7 +250,7 @@ static u8 sub_8078178(u8 battlerId, bool8 b)
         gTasks[taskId].data[1] = RGB_RED;
         for (i = 0; i < 10; i++)
         {
-            spriteId2 = CreateSprite(&sUnknown_83BF574, gSprites[battlerSpriteId].pos1.x, gSprites[battlerSpriteId].pos1.y + 32, 0);
+            spriteId2 = CreateSprite(&sUnknown_83BF574, gSprites[battlerSpriteId].x, gSprites[battlerSpriteId].y + 32, 0);
             gSprites[spriteId2].data[0] = i * 51;
             gSprites[spriteId2].data[1] = -256;
             gSprites[spriteId2].invisible = TRUE;
@@ -263,7 +263,7 @@ static u8 sub_8078178(u8 battlerId, bool8 b)
         gTasks[taskId].data[1] = RGB_BLUE;
         for (i = 0; i < 10; i++)
         {
-            spriteId2 = CreateSprite(&sUnknown_83BF574, gSprites[battlerSpriteId].pos1.x, gSprites[battlerSpriteId].pos1.y - 32, 0);
+            spriteId2 = CreateSprite(&sUnknown_83BF574, gSprites[battlerSpriteId].x, gSprites[battlerSpriteId].y - 32, 0);
             gSprites[spriteId2].data[0] = i * 51;
             gSprites[spriteId2].data[1] = 256;
             gSprites[spriteId2].invisible = TRUE;
@@ -324,15 +324,15 @@ static void sub_807834C(struct Sprite *sprite)
 
 static void sub_8078380(struct Sprite *sprite)
 {
-    sprite->pos2.x = Cos(sprite->data[0], 32);
-    sprite->pos2.y = Sin(sprite->data[0], 8);
+    sprite->x2 = Cos(sprite->data[0], 32);
+    sprite->y2 = Sin(sprite->data[0], 8);
     if (sprite->data[0] < 128)
         sprite->subpriority = 29;
     else
         sprite->subpriority = 31;
     sprite->data[0] = (sprite->data[0] + 8) & 0xFF;
     sprite->data[5] += sprite->data[1];
-    sprite->pos2.y += sprite->data[5] >> 8;
+    sprite->y2 += sprite->data[5] >> 8;
     sprite->data[2]++;
     if (sprite->data[2] == 52)
     {

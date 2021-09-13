@@ -1106,7 +1106,7 @@ bool8 ScrCmd_showobject_at(struct ScriptContext * ctx)
     u8 mapGroup = ScriptReadByte(ctx);
     u8 mapNum = ScriptReadByte(ctx);
 
-    npc_by_local_id_and_map_set_field_1_bit_x20(localId, mapNum, mapGroup, 0);
+    ShowOrHideObjectByLocalIdAndMap(localId, mapNum, mapGroup, 0);
     return FALSE;
 }
 
@@ -1116,7 +1116,7 @@ bool8 ScrCmd_hideobject_at(struct ScriptContext * ctx)
     u8 mapGroup = ScriptReadByte(ctx);
     u8 mapNum = ScriptReadByte(ctx);
 
-    npc_by_local_id_and_map_set_field_1_bit_x20(localId, mapNum, mapGroup, 1);
+    ShowOrHideObjectByLocalIdAndMap(localId, mapNum, mapGroup, 1);
     return FALSE;
 }
 
@@ -1127,7 +1127,7 @@ bool8 ScrCmd_setobjectpriority(struct ScriptContext * ctx)
     u8 mapNum = ScriptReadByte(ctx);
     u8 priority = ScriptReadByte(ctx);
 
-    sub_805F3A8(localId, mapNum, mapGroup, priority + 83);
+    SetObjectPriorityByLocalIdAndMap(localId, mapNum, mapGroup, priority + 83);
     return FALSE;
 }
 
@@ -1137,7 +1137,7 @@ bool8 ScrCmd_resetobjectpriority(struct ScriptContext * ctx)
     u8 mapGroup = ScriptReadByte(ctx);
     u8 mapNum = ScriptReadByte(ctx);
 
-    sub_805F400(localId, mapNum, mapGroup);
+    UnfixObjectPriorityByLocalIdAndMap(localId, mapNum, mapGroup);
     return FALSE;
 }
 
@@ -2230,21 +2230,21 @@ bool8 ScrCmd_normalmsg(struct ScriptContext * ctx)
     return FALSE;
 }
 
-// This command will force the Pokémon to be obedient, you don't get to make it disobedient.
-bool8 ScrCmd_setmonobedient(struct ScriptContext * ctx)
+// This command will set a Pokémon's eventLegal bit; there is no similar command to clear it.
+bool8 ScrCmd_setmoneventlegal(struct ScriptContext * ctx)
 {
-    bool8 obedient = TRUE;
+    bool8 isEventLegal = TRUE;
     u16 partyIndex = VarGet(ScriptReadHalfword(ctx));
 
-    SetMonData(&gPlayerParty[partyIndex], MON_DATA_OBEDIENCE, &obedient);
+    SetMonData(&gPlayerParty[partyIndex], MON_DATA_EVENT_LEGAL, &isEventLegal);
     return FALSE;
 }
 
-bool8 ScrCmd_checkmonobedience(struct ScriptContext * ctx)
+bool8 ScrCmd_checkmoneventlegal(struct ScriptContext * ctx)
 {
     u16 partyIndex = VarGet(ScriptReadHalfword(ctx));
 
-    gSpecialVar_Result = GetMonData(&gPlayerParty[partyIndex], MON_DATA_OBEDIENCE, NULL);
+    gSpecialVar_Result = GetMonData(&gPlayerParty[partyIndex], MON_DATA_EVENT_LEGAL, NULL);
     return FALSE;
 }
 

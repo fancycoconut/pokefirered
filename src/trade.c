@@ -411,7 +411,7 @@ static const u8 gUnknown_8261E92[] = {
 };
 
 const u8 sText_Dummy[] = _("");
-const u8 sText_ClrDkGryHltTranspShdwRed[] = _("{COLOR DARK_GREY}{HIGHLIGHT TRANSPARENT}{SHADOW RED}");
+const u8 sText_ClrWhtHltTranspShdwDrkGry[] = _("{COLOR WHITE}{HIGHLIGHT TRANSPARENT}{SHADOW DARK_GRAY}");
 const u8 gText_MaleSymbol4[] = _("♂");
 const u8 gText_FemaleSymbol4[] = _("♀");
 const u8 gText_GenderlessSymbol[] = _("");
@@ -455,7 +455,7 @@ static const u8 *const sTradeErrorOrStatusMessagePtrs[] = {
     gText_OtherTrainersPkmnCantBeTraded  // The other TRAINER's POKéMON can't be traded now
 };
 
-static const u8 sTextColor_PartyMonNickname[] = { TEXT_COLOR_TRANSPARENT, TEXT_COLOR_WHITE, TEXT_COLOR_DARK_GREY };
+static const u8 sTextColor_PartyMonNickname[] = { TEXT_COLOR_TRANSPARENT, TEXT_COLOR_WHITE, TEXT_COLOR_DARK_GRAY };
 
 static const struct BgTemplate sBgTemplates[] = {
     {
@@ -674,7 +674,7 @@ static const u8 gUnknown_8262055[][2] = {
 static void InitTradeMenuResources(void)
 {
     int i;
-    static vu16 dummy;
+    static u16 dummy;
 
     ResetSpriteData();
     FreeAllSpritePalettes();
@@ -723,11 +723,6 @@ static void CB2_ReturnFromLinkTrade2(void)
     u8 id;
     s32 width;
     u32 xPos;
-#ifndef NONMATCHING
-    register u32 r0 asm("r0");
-#else
-    u32 r0;
-#endif
     u8 *name;
 
     switch (gMain.state)
@@ -814,7 +809,7 @@ static void CB2_ReturnFromLinkTrade2(void)
             if (gWirelessCommType)
             {
                 ToggleLMANlinkRecovery(TRUE);
-                PrepareSendLinkCmd2FFE_or_RfuCmd6600();
+                SetLinkStandbyCallback();
             }
         }
         break;
@@ -895,7 +890,8 @@ static void CB2_ReturnFromLinkTrade2(void)
             gMain.state++;
         break;
     case 12:
-        width = GetStringWidth(1, gSaveBlock2Ptr->playerName, 0);
+        name = gSaveBlock2Ptr->playerName;
+        width = GetStringWidth(1, name, 0);
         xPos = (56 - width) / 2;
         for (i = 0; i < 3; i++)
         {
@@ -904,9 +900,8 @@ static void CB2_ReturnFromLinkTrade2(void)
             CreateSprite(&temp, xPos + sTradeUnknownSpriteCoords[LANGUAGE_ENGLISH - 1][0] + (i * 32), sTradeUnknownSpriteCoords[LANGUAGE_ENGLISH - 1][1], 1);
         }
         id = GetMultiplayerId();
-        r0 = (id ^ 1) * sizeof(*gLinkPlayers);
-        name = gLinkPlayers->name;
-        width = GetStringWidth(1, name + r0, 0);
+        name = gLinkPlayers[id ^ 1].name;
+        width = GetStringWidth(1, name, 0);
         xPos = (56 - width) / 2;
         for (i = 0; i < 3; i++)
         {
@@ -999,11 +994,6 @@ void CB2_ReturnToTradeMenuFromSummary(void)
     u8 id;
     s32 width;
     u32 xPos;
-#ifndef NONMATCHING
-    register u32 r0 asm("r0");
-#else
-    u32 r0;
-#endif
     u8 *name;
 
     switch (gMain.state)
@@ -1095,7 +1085,8 @@ void CB2_ReturnToTradeMenuFromSummary(void)
         }
         break;
     case 12:
-        width = GetStringWidth(1, gSaveBlock2Ptr->playerName, 0);
+        name = gSaveBlock2Ptr->playerName;
+        width = GetStringWidth(1, name, 0);
         xPos = (56 - width) / 2;
         for (i = 0; i < 3; i++)
         {
@@ -1104,9 +1095,8 @@ void CB2_ReturnToTradeMenuFromSummary(void)
             CreateSprite(&temp, xPos + sTradeUnknownSpriteCoords[LANGUAGE_ENGLISH - 1][0] + (i * 32), sTradeUnknownSpriteCoords[LANGUAGE_ENGLISH - 1][1], 1);
         }
         id = GetMultiplayerId();
-        r0 = (id ^ 1) * sizeof(*gLinkPlayers);
-        name = gLinkPlayers->name;
-        width = GetStringWidth(1, name + r0, 0);
+        name = gLinkPlayers[id ^ 1].name;
+        width = GetStringWidth(1, name, 0);
         xPos = (56 - width) / 2;
         for (i = 0; i < 3; i++)
         {
@@ -1675,14 +1665,14 @@ static void TradeMenuMoveCursor(u8 *tradeMenuCursorPosition, u8 direction)
     if (newPosition == 12) // CANCEL
     {
         StartSpriteAnim(&gSprites[sTradeMenuResourcesPtr->tradeMenuCursorSpriteIdx], 1);
-        gSprites[sTradeMenuResourcesPtr->tradeMenuCursorSpriteIdx].pos1.x = 224;
-        gSprites[sTradeMenuResourcesPtr->tradeMenuCursorSpriteIdx].pos1.y = 160;
+        gSprites[sTradeMenuResourcesPtr->tradeMenuCursorSpriteIdx].x = 224;
+        gSprites[sTradeMenuResourcesPtr->tradeMenuCursorSpriteIdx].y = 160;
     }
     else
     {
         StartSpriteAnim(&gSprites[sTradeMenuResourcesPtr->tradeMenuCursorSpriteIdx], 0);
-        gSprites[sTradeMenuResourcesPtr->tradeMenuCursorSpriteIdx].pos1.x = sTradeMonSpriteCoords[newPosition][0] * 8 + 32;
-        gSprites[sTradeMenuResourcesPtr->tradeMenuCursorSpriteIdx].pos1.y = sTradeMonSpriteCoords[newPosition][1] * 8;
+        gSprites[sTradeMenuResourcesPtr->tradeMenuCursorSpriteIdx].x = sTradeMonSpriteCoords[newPosition][0] * 8 + 32;
+        gSprites[sTradeMenuResourcesPtr->tradeMenuCursorSpriteIdx].y = sTradeMonSpriteCoords[newPosition][1] * 8;
     }
 
     if (*tradeMenuCursorPosition != newPosition)
@@ -1827,9 +1817,9 @@ static void TradeMenuCB_2(void)
     if (!gPaletteFade.active)
     {
         if (sTradeMenuResourcesPtr->tradeMenuCursorPosition < 6)
-            ShowPokemonSummaryScreen(gPlayerParty, sTradeMenuResourcesPtr->tradeMenuCursorPosition, sTradeMenuResourcesPtr->partyCounts[0] - 1, CB2_ReturnToTradeMenuFromSummary, 4);
+            ShowPokemonSummaryScreen(gPlayerParty, sTradeMenuResourcesPtr->tradeMenuCursorPosition, sTradeMenuResourcesPtr->partyCounts[0] - 1, CB2_ReturnToTradeMenuFromSummary, PSS_MODE_TRADE);
         else
-            ShowPokemonSummaryScreen(gEnemyParty, sTradeMenuResourcesPtr->tradeMenuCursorPosition - 6, sTradeMenuResourcesPtr->partyCounts[1] - 1, CB2_ReturnToTradeMenuFromSummary, 4);
+            ShowPokemonSummaryScreen(gEnemyParty, sTradeMenuResourcesPtr->tradeMenuCursorPosition - 6, sTradeMenuResourcesPtr->partyCounts[1] - 1, CB2_ReturnToTradeMenuFromSummary, PSS_MODE_TRADE);
         FreeAllWindowBuffers();
     }
 }
@@ -1845,7 +1835,7 @@ static u8 PlayerHasEnoughPokemonToTrade_HandleMewDeoxys(u8 *flags, u8 partyCount
             count += flags[i];
     }
     species = GetMonData(&gEnemyParty[sTradeMenuResourcesPtr->otherPlayerCursorPosition % 6], MON_DATA_SPECIES);
-    if ((species == SPECIES_DEOXYS || species == SPECIES_MEW) && !GetMonData(&gEnemyParty[sTradeMenuResourcesPtr->otherPlayerCursorPosition % 6], MON_DATA_OBEDIENCE))
+    if ((species == SPECIES_DEOXYS || species == SPECIES_MEW) && !GetMonData(&gEnemyParty[sTradeMenuResourcesPtr->otherPlayerCursorPosition % 6], MON_DATA_EVENT_LEGAL))
         return 2;
     if (count != 0)
         count = 1;
@@ -2001,7 +1991,7 @@ static void TradeMenuCB_11(void)
     {
         if (gWirelessCommType)
         {
-            PrepareSendLinkCmd2FFE_or_RfuCmd6600();
+            SetLinkStandbyCallback();
         }
         else
         {
@@ -2041,7 +2031,7 @@ static void TradeMenuCB_16(void)
 {
     if (!ToggleLMANlinkRecovery(FALSE))
     {
-        PrepareSendLinkCmd2FFE_or_RfuCmd6600();
+        SetLinkStandbyCallback();
         sTradeMenuResourcesPtr->tradeMenuCBnum = 13;
     }
 }
@@ -2165,10 +2155,10 @@ static void HandleRedrawTradeMenuOnSide(u8 side)
     case 3:
         CopyToBgTilemapBufferRect_ChangePalette(1, sTradeMovesBoxTilemap, whichParty * 15, 0, 15, 17, 0);
         CopyBgTilemapBufferToVram(1);
-        gSprites[sTradeMenuResourcesPtr->partyIcons[0][partyIdx + (whichParty * PARTY_SIZE)]].pos1.x = (sTradeMonSpriteCoords[whichParty * PARTY_SIZE][0] + sTradeMonSpriteCoords[whichParty * PARTY_SIZE + 1][0]) / 2 * 8 + 14;
-        gSprites[sTradeMenuResourcesPtr->partyIcons[0][partyIdx + (whichParty * PARTY_SIZE)]].pos1.y = (sTradeMonSpriteCoords[whichParty * PARTY_SIZE][1] * 8) - 12;
-        gSprites[sTradeMenuResourcesPtr->partyIcons[0][partyIdx + (whichParty * PARTY_SIZE)]].pos2.x = 0;
-        gSprites[sTradeMenuResourcesPtr->partyIcons[0][partyIdx + (whichParty * PARTY_SIZE)]].pos2.y = 0;
+        gSprites[sTradeMenuResourcesPtr->partyIcons[0][partyIdx + (whichParty * PARTY_SIZE)]].x = (sTradeMonSpriteCoords[whichParty * PARTY_SIZE][0] + sTradeMonSpriteCoords[whichParty * PARTY_SIZE + 1][0]) / 2 * 8 + 14;
+        gSprites[sTradeMenuResourcesPtr->partyIcons[0][partyIdx + (whichParty * PARTY_SIZE)]].y = (sTradeMonSpriteCoords[whichParty * PARTY_SIZE][1] * 8) - 12;
+        gSprites[sTradeMenuResourcesPtr->partyIcons[0][partyIdx + (whichParty * PARTY_SIZE)]].x2 = 0;
+        gSprites[sTradeMenuResourcesPtr->partyIcons[0][partyIdx + (whichParty * PARTY_SIZE)]].y2 = 0;
         nameStringWidth = GetNicknameStringWidthByPartyAndMonIdx(nickname, whichParty, partyIdx);
         AddTextPrinterParameterized3((side * 2) + 14, 0, (80 - nameStringWidth) / 2, 4, sTextColor_PartyMonNickname, 0, nickname);
         BuildMovesString(movesString, whichParty, partyIdx);
@@ -2352,10 +2342,10 @@ static void ShowTradePartyMonIcons(u8 whichParty)
     for (i = 0; i < sTradeMenuResourcesPtr->partyCounts[whichParty]; i++)
     {
         gSprites[sTradeMenuResourcesPtr->partyIcons[whichParty][i]].invisible = FALSE;
-        gSprites[sTradeMenuResourcesPtr->partyIcons[whichParty][i]].pos1.x = sTradeMonSpriteCoords[(whichParty * PARTY_SIZE) + i][0] * 8 + 14;
-        gSprites[sTradeMenuResourcesPtr->partyIcons[whichParty][i]].pos1.y = sTradeMonSpriteCoords[(whichParty * PARTY_SIZE) + i][1] * 8 - 12;
-        gSprites[sTradeMenuResourcesPtr->partyIcons[whichParty][i]].pos2.x = 0;
-        gSprites[sTradeMenuResourcesPtr->partyIcons[whichParty][i]].pos2.y = 0;
+        gSprites[sTradeMenuResourcesPtr->partyIcons[whichParty][i]].x = sTradeMonSpriteCoords[(whichParty * PARTY_SIZE) + i][0] * 8 + 14;
+        gSprites[sTradeMenuResourcesPtr->partyIcons[whichParty][i]].y = sTradeMonSpriteCoords[(whichParty * PARTY_SIZE) + i][1] * 8 - 12;
+        gSprites[sTradeMenuResourcesPtr->partyIcons[whichParty][i]].x2 = 0;
+        gSprites[sTradeMenuResourcesPtr->partyIcons[whichParty][i]].y2 = 0;
     }
 }
 
@@ -2633,7 +2623,7 @@ static u32 TestWhetherSelectedMonCanBeTraded(struct Pokemon * party, int partyCo
     if ((player->version & 0xFF) != VERSION_RUBY &&
         (player->version & 0xFF) != VERSION_SAPPHIRE)
     {
-        if ((player->name[10] & 0xF) == 0)
+        if ((player->progressFlagsCopy & 0xF) == 0)
         {
             if (species2[cursorPos] == SPECIES_EGG)
             {
@@ -2649,7 +2639,7 @@ static u32 TestWhetherSelectedMonCanBeTraded(struct Pokemon * party, int partyCo
 
     if (species[cursorPos] == SPECIES_DEOXYS || species[cursorPos] == SPECIES_MEW)
     {
-        if (!GetMonData(&party[cursorPos], MON_DATA_OBEDIENCE))
+        if (!GetMonData(&party[cursorPos], MON_DATA_EVENT_LEGAL))
         {
             return 4;
         }
@@ -2707,11 +2697,11 @@ s32 Trade_CalcLinkPlayerCompatibilityParam(void)
 
         if (val > 0)
         {
-            if (gLinkPlayers[GetMultiplayerId()].name[10] & 0xF0)
+            if (gLinkPlayers[GetMultiplayerId()].progressFlagsCopy & 0xF0)
             {
                 if (val == 2)
                 {
-                    if (gLinkPlayers[GetMultiplayerId() ^ 1].name[10] & 0xF0)
+                    if (gLinkPlayers[GetMultiplayerId() ^ 1].progressFlagsCopy & 0xF0)
                     {
                         return 0;
                     }
@@ -2730,17 +2720,17 @@ s32 Trade_CalcLinkPlayerCompatibilityParam(void)
     return 0;
 }
 
-static bool32 IsDeoxysOrMewUntradable(u16 species, bool8 isObedientBitSet)
+static bool32 IsDeoxysOrMewUntradable(u16 species, bool8 isEventLegal)
 {
     if (species == SPECIES_DEOXYS || species == SPECIES_MEW)
     {
-        if (!isObedientBitSet)
+        if (!isEventLegal)
             return TRUE;
     }
     return FALSE;
 }
 
-int GetUnionRoomTradeMessageId(struct GFtgtGnameSub playerSub, struct GFtgtGnameSub partnerSub, u16 species1, u16 species2, u8 type, u16 species3, u8 isObedientBitSet)
+int GetUnionRoomTradeMessageId(struct GFtgtGnameSub playerSub, struct GFtgtGnameSub partnerSub, u16 species1, u16 species2, u8 type, u16 species3, u8 isEventLegal)
 {
     u8 playerHasNationalDex = playerSub.hasNationalDex;
     u8 playerIsChampion = playerSub.isChampion;
@@ -2769,7 +2759,7 @@ int GetUnionRoomTradeMessageId(struct GFtgtGnameSub playerSub, struct GFtgtGname
         }
     }
 
-    if (IsDeoxysOrMewUntradable(species3, isObedientBitSet))
+    if (IsDeoxysOrMewUntradable(species3, isEventLegal))
     {
         return 4;
     }
@@ -2820,11 +2810,11 @@ int GetUnionRoomTradeMessageId(struct GFtgtGnameSub playerSub, struct GFtgtGname
     return 0;
 }
 
-int CanRegisterMonForTradingBoard(struct GFtgtGnameSub playerSub, u16 species2, u16 species, u8 obedience)
+int CanRegisterMonForTradingBoard(struct GFtgtGnameSub playerSub, u16 species2, u16 species, u8 isEventLegal)
 {
     u8 canTradeEggAndNational = playerSub.hasNationalDex;
 
-    if (IsDeoxysOrMewUntradable(species, obedience))
+    if (IsDeoxysOrMewUntradable(species, isEventLegal))
     {
         return 1;
     }

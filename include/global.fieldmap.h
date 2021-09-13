@@ -82,14 +82,6 @@ struct BackupMapLayout
     u16 *map;
 };
 
-union __attribute__((packed)) ObjectEventRange {
-    u8 as_byte;
-    struct __attribute__((packed)) {
-        u8 x:4;
-        u8 y:4;
-    } __attribute__((aligned (1))) as_nybbles;
-} __attribute__((aligned (1)));
-
 struct ObjectEventTemplate
 {
     /*0x00*/ u8 localId;
@@ -239,8 +231,9 @@ struct ObjectEvent
     /*0x10*/        struct Coords16 currentCoords;
     /*0x14*/        struct Coords16 previousCoords;
     /*0x18*/        u8 facingDirection:4;
-    /*0x18*/        u8 movementDirection:4;
-    /*0x19*/        union ObjectEventRange range;
+                    u8 movementDirection:4;
+                    u16 rangeX:4;
+                    u16 rangeY:4;
     /*0x1A*/        u8 fieldEffectSpriteId;
     /*0x1B*/        u8 warpArrowSpriteId;
     /*0x1C*/        u8 movementActionId;
@@ -256,8 +249,8 @@ struct ObjectEvent
 struct ObjectEventGraphicsInfo
 {
     /*0x00*/ u16 tileTag;
-    /*0x02*/ u16 paletteTag1;
-    /*0x04*/ u16 paletteTag2;
+    /*0x02*/ u16 paletteTag;
+    /*0x04*/ u16 reflectionPaletteTag;
     /*0x06*/ u16 size;
     /*0x08*/ s16 width;
     /*0x0A*/ s16 height;
@@ -279,19 +272,28 @@ enum {
     PLAYER_AVATAR_STATE_ACRO_BIKE,
     PLAYER_AVATAR_STATE_SURFING,
     PLAYER_AVATAR_STATE_UNDERWATER,
-    PLAYER_AVATAR_STATE_FIELD_MOVE,
-    PLAYER_AVATAR_STATE_FISHING,
-    PLAYER_AVATAR_STATE_WATERING,
+    PLAYER_AVATAR_STATE_CONTROLLABLE,
+    PLAYER_AVATAR_STATE_FORCED,
+    PLAYER_AVATAR_STATE_DASH,
 };
 
-#define PLAYER_AVATAR_FLAG_ON_FOOT    (1 << PLAYER_AVATAR_STATE_NORMAL)
-#define PLAYER_AVATAR_FLAG_MACH_BIKE  (1 << PLAYER_AVATAR_STATE_MACH_BIKE)
-#define PLAYER_AVATAR_FLAG_ACRO_BIKE  (1 << PLAYER_AVATAR_STATE_ACRO_BIKE)
-#define PLAYER_AVATAR_FLAG_SURFING    (1 << PLAYER_AVATAR_STATE_SURFING)
-#define PLAYER_AVATAR_FLAG_UNDERWATER (1 << PLAYER_AVATAR_STATE_UNDERWATER)
-#define PLAYER_AVATAR_FLAG_FIELD_MOVE (1 << PLAYER_AVATAR_STATE_FIELD_MOVE)
-#define PLAYER_AVATAR_FLAG_FISHING    (1 << PLAYER_AVATAR_STATE_FISHING)
-#define PLAYER_AVATAR_FLAG_DASH       (1 << PLAYER_AVATAR_STATE_WATERING)
+#define PLAYER_AVATAR_FLAG_ON_FOOT      (1 << PLAYER_AVATAR_STATE_NORMAL)
+#define PLAYER_AVATAR_FLAG_MACH_BIKE    (1 << PLAYER_AVATAR_STATE_MACH_BIKE)
+#define PLAYER_AVATAR_FLAG_ACRO_BIKE    (1 << PLAYER_AVATAR_STATE_ACRO_BIKE)
+#define PLAYER_AVATAR_FLAG_SURFING      (1 << PLAYER_AVATAR_STATE_SURFING)
+#define PLAYER_AVATAR_FLAG_UNDERWATER   (1 << PLAYER_AVATAR_STATE_UNDERWATER)
+#define PLAYER_AVATAR_FLAG_CONTROLLABLE (1 << PLAYER_AVATAR_STATE_CONTROLLABLE)
+#define PLAYER_AVATAR_FLAG_FORCED       (1 << PLAYER_AVATAR_STATE_FORCED)
+#define PLAYER_AVATAR_FLAG_DASH         (1 << PLAYER_AVATAR_STATE_DASH)
+
+enum {
+    PLAYER_AVATAR_GFX_NORMAL,
+    PLAYER_AVATAR_GFX_BIKE,
+    PLAYER_AVATAR_GFX_RIDE,
+    PLAYER_AVATAR_GFX_FIELD_MOVE,
+    PLAYER_AVATAR_GFX_FISH,
+    PLAYER_AVATAR_GFX_VSSEEKER,
+};
 
 enum
 {

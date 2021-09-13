@@ -1,6 +1,5 @@
 #include "global.h"
 #include "gflib.h"
-#include "data.h"
 #include "decompress.h"
 #include "event_data.h"
 #include "event_object_movement.h"
@@ -29,6 +28,10 @@
 #include "constants/metatile_behaviors.h"
 #include "constants/songs.h"
 
+extern struct CompressedSpritePalette gMonPaletteTable[]; // Intentionally declared (incorrectly) without const in order to match
+extern const struct CompressedSpritePalette gTrainerFrontPicPaletteTable[];
+extern const struct CompressedSpriteSheet gTrainerFrontPicTable[];
+
 #define subsprite_table(ptr) {.subsprites = ptr, .subspriteCount = (sizeof ptr) / (sizeof(struct Subsprite))}
 #define FIELD_EFFECT_COUNT 32
 
@@ -56,10 +59,10 @@ static void SpriteCB_PokeballGlow(struct Sprite * sprite);
 static void SpriteCB_PokecenterMonitor(struct Sprite * sprite);
 static void SpriteCB_HallOfFameMonitor(struct Sprite * sprite);
 
-static const u16 sNewGameOakObjectSpriteTiles[] = INCBIN_U16("graphics/field_effects/unk_83CA770.4bpp");
-static const u16 sNewGameOakObjectPals[] = INCBIN_U16("graphics/field_effects/unk_83CAF70.gbapal");
-static const u16 sUnknown_83CAF90[] = INCBIN_U16("graphics/field_effects/unk_83CAF90.4bpp");
-static const u16 sUnknown_83CAFB0[] = INCBIN_U16("graphics/field_effects/unk_83CAFB0.gbapal");
+static const u16 sNewGameOakObjectSpriteTiles[] = INCBIN_U16("graphics/field_effects/new_game_oak.4bpp");
+static const u16 sNewGameOakObjectPals[] = INCBIN_U16("graphics/field_effects/new_game_oak.gbapal");
+static const u16 sPokeballGfx[] = INCBIN_U16("graphics/field_effects/pokeball.4bpp");
+static const u16 sPokeballPal[] = INCBIN_U16("graphics/field_effects/pokeball.gbapal");
 static const u16 sUnknown_83CAFD0[] = INCBIN_U16("graphics/field_effects/unk_83CAFD0.4bpp");
 static const u16 sUnknown_83CB3D0[] = INCBIN_U16("graphics/field_effects/unk_83CB3D0.gbapal");
 static const u16 sUnknown_83CB3F0[] = INCBIN_U16("graphics/field_effects/unk_83CB3F0.4bpp");
@@ -158,7 +161,7 @@ static const struct SpriteTemplate sNewGameOakObjectTemplate = {
 };
 
 const struct SpritePalette gUnknown_83CBE9C = {
-    sUnknown_83CAFB0, 4103
+    sPokeballPal, 4103
 };
 
 const struct SpritePalette gUnknown_83CBEA4 = {
@@ -182,7 +185,7 @@ static const struct OamData sOamData_83CBEAC = {
 };
 
 static const struct SpriteFrameImage sUnknown_83CBEB4[] = {
-    {sUnknown_83CAF90, 0x20}
+    {sPokeballGfx, 0x20}
 };
 
 static const struct SpriteFrameImage sUnknown_83CBEBC[] = {
@@ -419,9 +422,9 @@ static void FieldEffectScript_LoadTiles(const u8 **script)
     *script += sizeof(u32);
 }
 
-void sub_8083598(u8 paletteIdx)
+void ApplyGlobalFieldPaletteTint(u8 paletteIdx)
 {
-    switch (gUnknown_2036E28)
+    switch (gGlobalFieldTintMode)
     {
     case 0:
         return;
@@ -432,7 +435,7 @@ void sub_8083598(u8 paletteIdx)
         TintPalette_SepiaTone(&gPlttBufferUnfaded[(paletteIdx + 16) * 16], 0x10);
         break;
     case 3:
-        sub_8111F38((paletteIdx + 16) * 16, 0x10);
+        QuestLog_BackUpPalette((paletteIdx + 16) * 16, 0x10);
         TintPalette_GrayScale(&gPlttBufferUnfaded[(paletteIdx + 16) * 16], 0x10);
         break;
     default:
@@ -447,7 +450,7 @@ static void FieldEffectScript_LoadFadedPal(const u8 **script)
     u8 idx = IndexOfSpritePaletteTag(spritePalette->tag);
     LoadSpritePalette(spritePalette);
     if (idx == 0xFF)
-        sub_8083598(IndexOfSpritePaletteTag(spritePalette->tag));
+        ApplyGlobalFieldPaletteTint(IndexOfSpritePaletteTag(spritePalette->tag));
     UpdateSpritePaletteWithWeather(IndexOfSpritePaletteTag(spritePalette->tag));
     *script += sizeof(u32);
 }
@@ -458,7 +461,7 @@ static void FieldEffectScript_LoadPal(const u8 **script)
     u8 idx = IndexOfSpritePaletteTag(spritePalette->tag);
     LoadSpritePalette(spritePalette);
     if (idx != 0xFF)
-        sub_8083598(IndexOfSpritePaletteTag(spritePalette->tag));
+        ApplyGlobalFieldPaletteTint(IndexOfSpritePaletteTag(spritePalette->tag));
     *script += sizeof(u32);
 }
 
@@ -823,8 +826,8 @@ static u8 CreatePokeballGlowSprite(s16 duration, s16 x, s16 y, bool16 fanfare)
     struct Sprite * sprite;
     spriteId = CreateInvisibleSprite(SpriteCB_PokeballGlowEffect);
     sprite = &gSprites[spriteId];
-    sprite->pos2.x = x;
-    sprite->pos2.y = y;
+    sprite->x2 = x;
+    sprite->y2 = y;
     sprite->subpriority = 0xFF;
     sprite->data[5] = fanfare;
     sprite->data[6] = duration;
@@ -856,7 +859,7 @@ static void PokeballGlowEffect_0(struct Sprite * sprite)
     if (sprite->data[1] == 0 || (--sprite->data[1]) == 0)
     {
         sprite->data[1] = 25;
-        endSpriteId = CreateSpriteAtEnd(&sUnknown_83CBF88, sUnknown_83CC010[sprite->data[2]].x + sprite->pos2.x, sUnknown_83CC010[sprite->data[2]].y + sprite->pos2.y, 0xFF);
+        endSpriteId = CreateSpriteAtEnd(&sUnknown_83CBF88, sUnknown_83CC010[sprite->data[2]].x + sprite->x2, sUnknown_83CC010[sprite->data[2]].y + sprite->y2, 0xFF);
         gSprites[endSpriteId].oam.priority = 2;
         gSprites[endSpriteId].data[0] = sprite->data[7];
         sprite->data[2]++;
@@ -1152,7 +1155,7 @@ static bool8 FallWarpEffect_3(struct Task * task)
     s16 centerToCornerVecY;
     sprite = &gSprites[gPlayerAvatar.spriteId];
     centerToCornerVecY = -(sprite->centerToCornerVecY << 1);
-    sprite->pos2.y = -(sprite->pos1.y + sprite->centerToCornerVecY + gSpriteCoordOffsetY + centerToCornerVecY);
+    sprite->y2 = -(sprite->y + sprite->centerToCornerVecY + gSpriteCoordOffsetY + centerToCornerVecY);
     task->data[1] = 1;
     task->data[2] = 0;
     gObjectEvents[gPlayerAvatar.objectEventId].invisible = FALSE;
@@ -1168,7 +1171,7 @@ static bool8 FallWarpEffect_4(struct Task * task)
 
     objectEvent = &gObjectEvents[gPlayerAvatar.objectEventId];
     sprite = &gSprites[gPlayerAvatar.spriteId];
-    sprite->pos2.y += task->data[1];
+    sprite->y2 += task->data[1];
     if (task->data[1] < 8)
     {
         task->data[2] += task->data[1];
@@ -1177,19 +1180,19 @@ static bool8 FallWarpEffect_4(struct Task * task)
             task->data[1] <<= 1;
         }
     }
-    if (task->data[3] == 0 && sprite->pos2.y >= -16)
+    if (task->data[3] == 0 && sprite->y2 >= -16)
     {
         task->data[3]++;
         objectEvent->fixedPriority = FALSE;
         sprite->subspriteMode = task->data[4];
         objectEvent->triggerGroundEffectsOnMove = TRUE;
     }
-    if (sprite->pos2.y >= 0)
+    if (sprite->y2 >= 0)
     {
         PlaySE(SE_M_STRENGTH);
         objectEvent->triggerGroundEffectsOnStop = TRUE;
         objectEvent->landingJump = TRUE;
-        sprite->pos2.y = 0;
+        sprite->y2 = 0;
         task->data[0]++;
     }
     return FALSE;
@@ -1290,7 +1293,7 @@ static bool8 EscalatorWarpEffect_1(struct Task * task)
     FreezeObjectEvents();
     CameraObjectReset2();
     StartEscalator(task->data[1]);
-    sub_81128BC(1);
+    QuestLog_OnEscalatorWarp(QL_ESCALATOR_OUT);
     task->data[0]++;
     return FALSE;
 }
@@ -1355,8 +1358,8 @@ static void Escalator_AnimatePlayerGoingDown(struct Task * task)
 {
     struct Sprite * sprite;
     sprite = &gSprites[gPlayerAvatar.spriteId];
-    sprite->pos2.x = Cos(0x84, task->data[2]);
-    sprite->pos2.y = Sin(0x94, task->data[2]);
+    sprite->x2 = Cos(0x84, task->data[2]);
+    sprite->y2 = Sin(0x94, task->data[2]);
     task->data[3]++;
     if (task->data[3] & 1)
     {
@@ -1368,8 +1371,8 @@ static void Escalator_AnimatePlayerGoingUp(struct Task * task)
 {
     struct Sprite * sprite;
     sprite = &gSprites[gPlayerAvatar.spriteId];
-    sprite->pos2.x = Cos(0x7c, task->data[2]);
-    sprite->pos2.y = Sin(0x76, task->data[2]);
+    sprite->x2 = Cos(0x7c, task->data[2]);
+    sprite->y2 = Sin(0x76, task->data[2]);
     task->data[3]++;
     if (task->data[3] & 1)
     {
@@ -1452,8 +1455,8 @@ static bool8 EscalatorWarpInEffect_2(struct Task * task)
 {
     struct Sprite * sprite;
     sprite = &gSprites[gPlayerAvatar.spriteId];
-    sprite->pos2.x = Cos(0x84, task->data[1]);
-    sprite->pos2.y = Sin(0x94, task->data[1]);
+    sprite->x2 = Cos(0x84, task->data[1]);
+    sprite->y2 = Sin(0x94, task->data[1]);
     task->data[0]++;
     return FALSE;
 }
@@ -1462,8 +1465,8 @@ static bool8 EscalatorWarpInEffect_3(struct Task * task)
 {
     struct Sprite * sprite;
     sprite = &gSprites[gPlayerAvatar.spriteId];
-    sprite->pos2.x = Cos(0x84, task->data[1]);
-    sprite->pos2.y = Sin(0x94, task->data[1]);
+    sprite->x2 = Cos(0x84, task->data[1]);
+    sprite->y2 = Sin(0x94, task->data[1]);
     task->data[2]++;
     if (task->data[2] & 1)
     {
@@ -1471,8 +1474,8 @@ static bool8 EscalatorWarpInEffect_3(struct Task * task)
     }
     if (task->data[1] == 0)
     {
-        sprite->pos2.x = 0;
-        sprite->pos2.y = 0;
+        sprite->x2 = 0;
+        sprite->y2 = 0;
         task->data[0] = 5;
     }
     return FALSE;
@@ -1483,8 +1486,8 @@ static bool8 EscalatorWarpInEffect_4(struct Task * task)
 {
     struct Sprite * sprite;
     sprite = &gSprites[gPlayerAvatar.spriteId];
-    sprite->pos2.x = Cos(0x7c, task->data[1]);
-    sprite->pos2.y = Sin(0x76, task->data[1]);
+    sprite->x2 = Cos(0x7c, task->data[1]);
+    sprite->y2 = Sin(0x76, task->data[1]);
     task->data[0]++;
     return FALSE;
 }
@@ -1493,8 +1496,8 @@ static bool8 EscalatorWarpInEffect_5(struct Task * task)
 {
     struct Sprite * sprite;
     sprite = &gSprites[gPlayerAvatar.spriteId];
-    sprite->pos2.x = Cos(0x7c, task->data[1]);
-    sprite->pos2.y = Sin(0x76, task->data[1]);
+    sprite->x2 = Cos(0x7c, task->data[1]);
+    sprite->y2 = Sin(0x76, task->data[1]);
     task->data[2]++;
     if (task->data[2] & 1)
     {
@@ -1502,8 +1505,8 @@ static bool8 EscalatorWarpInEffect_5(struct Task * task)
     }
     if (task->data[1] == 0)
     {
-        sprite->pos2.x = 0;
-        sprite->pos2.y = 0;
+        sprite->x2 = 0;
+        sprite->y2 = 0;
         task->data[0]++;
     }
     return FALSE;
@@ -1531,7 +1534,7 @@ static bool8 EscalatorWarpInEffect_7(struct Task * task)
         UnfreezeObjectEvents();
         ObjectEventSetHeldMovement(objectEvent, GetWalkNormalMovementAction(DIR_EAST));
         DestroyTask(FindTaskIdByFunc(Task_EscalatorWarpInFieldEffect));
-        sub_81128BC(2);
+        QuestLog_OnEscalatorWarp(QL_ESCALATOR_IN);
     }
     return FALSE;
 }
@@ -1597,7 +1600,7 @@ static bool8 waterfall_2_wait_anim_finish_probably(struct Task * task, struct Ob
 
 static bool8 waterfall_3_move_player_probably(struct Task * task, struct ObjectEvent * playerObj)
 {
-    ObjectEventSetHeldMovement(playerObj, sub_8063F2C(DIR_NORTH));
+    ObjectEventSetHeldMovement(playerObj, GetWalkSlowestMovementAction(DIR_NORTH));
     task->data[0]++;
     return FALSE;
 }
@@ -1733,7 +1736,7 @@ static bool8 LavaridgeGymB1FWarpEffect_2(struct Task * task, struct ObjectEvent 
 
 static bool8 LavaridgeGymB1FWarpEffect_3(struct Task * task, struct ObjectEvent * objectEvent, struct Sprite * sprite)
 {
-    sprite->pos2.y = 0;
+    sprite->y2 = 0;
     task->data[3] = 1;
     gFieldEffectArguments[0] = objectEvent->currentCoords.x;
     gFieldEffectArguments[1] = objectEvent->currentCoords.y;
@@ -1762,9 +1765,9 @@ static bool8 LavaridgeGymB1FWarpEffect_4(struct Task * task, struct ObjectEvent 
     if (task->data[2] > 6)
     {
         centerToCornerVecY = -(sprite->centerToCornerVecY << 1);
-        if (sprite->pos2.y > -(sprite->pos1.y + sprite->centerToCornerVecY + gSpriteCoordOffsetY + centerToCornerVecY))
+        if (sprite->y2 > -(sprite->y + sprite->centerToCornerVecY + gSpriteCoordOffsetY + centerToCornerVecY))
         {
-            sprite->pos2.y -= task->data[3];
+            sprite->y2 -= task->data[3];
             if (task->data[3] <= 7)
             {
                 task->data[3]++;
@@ -1774,7 +1777,7 @@ static bool8 LavaridgeGymB1FWarpEffect_4(struct Task * task, struct ObjectEvent 
             task->data[4] = 1;
         }
     }
-    if (task->data[5] == 0 && sprite->pos2.y < -0x10)
+    if (task->data[5] == 0 && sprite->y2 < -0x10)
     {
         task->data[5]++;
         objectEvent->fixedPriority = TRUE;
@@ -1900,13 +1903,13 @@ u8 FldEff_LavaridgeGymWarp(void)
 {
     u8 spriteId;
     sub_8063BC4((s16 *)&gFieldEffectArguments[0], (s16 *)&gFieldEffectArguments[1], 8, 8);
-    spriteId = CreateSpriteAtEnd(gFieldEffectObjectTemplatePointers[33], gFieldEffectArguments[0], gFieldEffectArguments[1], gFieldEffectArguments[2]);
+    spriteId = CreateSpriteAtEnd(gFieldEffectObjectTemplatePointers[FLDEFFOBJ_ASH_LAUNCH], gFieldEffectArguments[0], gFieldEffectArguments[1], gFieldEffectArguments[2]);
     gSprites[spriteId].oam.priority = gFieldEffectArguments[3];
     gSprites[spriteId].coordOffsetEnabled = TRUE;
     return spriteId;
 }
 
-void SpriteCB_LavaridgeGymWarp(struct Sprite * sprite)
+void SpriteCB_AshLaunch(struct Sprite * sprite)
 {
     if (sprite->animEnded)
     {
@@ -1993,7 +1996,7 @@ u8 FldEff_PopOutOfAsh(void)
 {
     u8 spriteId;
     sub_8063BC4((s16 *)&gFieldEffectArguments[0], (s16 *)&gFieldEffectArguments[1], 8, 8);
-    spriteId = CreateSpriteAtEnd(gFieldEffectObjectTemplatePointers[32], gFieldEffectArguments[0], gFieldEffectArguments[1], gFieldEffectArguments[2]);
+    spriteId = CreateSpriteAtEnd(gFieldEffectObjectTemplatePointers[FLDEFFOBJ_ASH_PUFF], gFieldEffectArguments[0], gFieldEffectArguments[1], gFieldEffectArguments[2]);
     gSprites[spriteId].oam.priority = gFieldEffectArguments[3];
     gSprites[spriteId].coordOffsetEnabled = TRUE;
     return spriteId;
@@ -2105,7 +2108,7 @@ static bool32 sub_80857F0(struct ObjectEvent * playerObj, s16 *state_p, s16 *y_p
         (*state_p)++;
         // fallthrough
     case 1:
-        sprite->pos2.y -= 8;
+        sprite->y2 -= 8;
         (*y_p) -= 8;
         if (*y_p <= -16)
         {
@@ -2117,7 +2120,7 @@ static bool32 sub_80857F0(struct ObjectEvent * playerObj, s16 *state_p, s16 *y_p
         }
         break;
     case 2:
-        sprite->pos2.y -= 8;
+        sprite->y2 -= 8;
         (*y_p) -= 8;
         if (*y_p <= -88)
         {
@@ -2144,7 +2147,7 @@ static bool32 sub_80858A4(struct ObjectEvent * playerObj, s16 *state_p, s16 *y_p
     case 0:
         CameraObjectReset2();
         *y_p = -88;
-        sprite->pos2.y -= 88;
+        sprite->y2 -= 88;
         *priority_p = sprite->oam.priority;
         *subpriority_p = sprite->subpriority;
         *subspriteMode_p = sprite->subspriteMode;
@@ -2155,7 +2158,7 @@ static bool32 sub_80858A4(struct ObjectEvent * playerObj, s16 *state_p, s16 *y_p
         (*state_p)++;
         // fallthrough
     case 1:
-        sprite->pos2.y += 4;
+        sprite->y2 += 4;
         (*y_p) += 4;
         if (*y_p >= -16)
         {
@@ -2166,7 +2169,7 @@ static bool32 sub_80858A4(struct ObjectEvent * playerObj, s16 *state_p, s16 *y_p
         }
         break;
     case 2:
-        sprite->pos2.y += 4;
+        sprite->y2 += 4;
         (*y_p) += 4;
         if (*y_p >= 0)
         {
@@ -2307,7 +2310,7 @@ static void TeleportFieldEffectTask3(struct Task * task)
         task->data[1] = 4;
         ObjectEventTurn(objectEvent, spinDirections[objectEvent->facingDirection]);
     }
-    sprite->pos1.y -= task->data[3];
+    sprite->y -= task->data[3];
     task->data[4] += task->data[3];
     if ((--task->data[2]) <= 0 && (task->data[2] = 4, task->data[3] < 8))
     {
@@ -2372,7 +2375,7 @@ static void TeleportInFieldEffectTask1(struct Task * task)
     {
         sprite = &gSprites[gPlayerAvatar.spriteId];
         centerToCornerVecY = -(sprite->centerToCornerVecY << 1);
-        sprite->pos2.y = -(sprite->pos1.y + sprite->centerToCornerVecY + gSpriteCoordOffsetY + centerToCornerVecY);
+        sprite->y2 = -(sprite->y + sprite->centerToCornerVecY + gSpriteCoordOffsetY + centerToCornerVecY);
         gObjectEvents[gPlayerAvatar.objectEventId].invisible = FALSE;
         task->data[0]++;
         task->data[1] = 8;
@@ -2388,7 +2391,7 @@ static void TeleportInFieldEffectTask2(struct Task * task)
     u8 spinDirections[5] = {1, 3, 4, 2, 1};
     struct ObjectEvent * objectEvent = &gObjectEvents[gPlayerAvatar.objectEventId];
     struct Sprite * sprite = &gSprites[gPlayerAvatar.spriteId];
-    if ((sprite->pos2.y += task->data[1]) >= -8)
+    if ((sprite->y2 += task->data[1]) >= -8)
     {
         if (task->data[13] == 0)
         {
@@ -2404,7 +2407,7 @@ static void TeleportInFieldEffectTask2(struct Task * task)
             sprite->subspriteMode = SUBSPRITES_IGNORE_PRIORITY;
         }
     }
-    if (sprite->pos2.y >= -0x30 && task->data[1] > 1 && !(sprite->pos2.y & 1))
+    if (sprite->y2 >= -0x30 && task->data[1] > 1 && !(sprite->y2 & 1))
     {
         task->data[1]--;
     }
@@ -2413,9 +2416,9 @@ static void TeleportInFieldEffectTask2(struct Task * task)
         task->data[2] = 4;
         ObjectEventTurn(objectEvent, spinDirections[objectEvent->facingDirection]);
     }
-    if (sprite->pos2.y >= 0)
+    if (sprite->y2 >= 0)
     {
-        sprite->pos2.y = 0;
+        sprite->y2 = 0;
         task->data[0]++;
         task->data[1] = 1;
         task->data[2] = 0;
@@ -2833,9 +2836,9 @@ static u8 sub_8086860(u32 species, u32 otId, u32 personality)
 
 static void sub_80868C0(struct Sprite * sprite)
 {
-    if ((sprite->pos1.x -= 20) <= 0x78)
+    if ((sprite->x -= 20) <= 0x78)
     {
-        sprite->pos1.x = 0x78;
+        sprite->x = 0x78;
         sprite->data[1] = 30;
         sprite->callback = sub_8086904;
         if (sprite->data[6])
@@ -2859,13 +2862,13 @@ static void sub_8086904(struct Sprite * sprite)
 
 static void sub_8086920(struct Sprite * sprite)
 {
-    if (sprite->pos1.x < -0x40)
+    if (sprite->x < -0x40)
     {
         sprite->data[7] = 1;
     }
     else
     {
-        sprite->pos1.x -= 20;
+        sprite->x -= 20;
     }
 }
 
@@ -2904,7 +2907,7 @@ static void UseSurfEffect_1(struct Task * task)
     ScriptContext2_Enable();
     FreezeObjectEvents();
     gPlayerAvatar.preventStep = TRUE;
-    SetPlayerAvatarStateMask(8);
+    SetPlayerAvatarStateMask(PLAYER_AVATAR_FLAG_SURFING);
     PlayerGetDestCoords(&task->data[1], &task->data[2]);
     MoveCoords(gObjectEvents[gPlayerAvatar.objectEventId].movementDirection, &task->data[1], &task->data[2]);
     task->data[0]++;
@@ -2916,7 +2919,7 @@ static void UseSurfEffect_2(struct Task * task)
     objectEvent = &gObjectEvents[gPlayerAvatar.objectEventId];
     if (!ObjectEventIsMovementOverridden(objectEvent) || ObjectEventClearHeldMovementIfFinished(objectEvent))
     {
-        sub_805CB70();
+        StartPlayerAvatarSummonMonForFieldMoveAnim();
         ObjectEventSetHeldMovement(objectEvent, MOVEMENT_ACTION_START_ANIM_IN_DIRECTION);
         task->data[0]++;
     }
@@ -2940,7 +2943,7 @@ static void UseSurfEffect_4(struct Task * task)
     if (!FieldEffectActiveListContains(FLDEFF_FIELD_MOVE_SHOW_MON))
     {
         objectEvent = &gObjectEvents[gPlayerAvatar.objectEventId];
-        ObjectEventSetGraphicsId(objectEvent, GetPlayerAvatarGraphicsIdByStateId(2));
+        ObjectEventSetGraphicsId(objectEvent, GetPlayerAvatarGraphicsIdByStateId(PLAYER_AVATAR_GFX_RIDE));
         ObjectEventClearHeldMovementIfFinished(objectEvent);
         ObjectEventSetHeldMovement(objectEvent, sub_80641C0(objectEvent->movementDirection));
         gFieldEffectArguments[0] = task->data[1];
@@ -2958,7 +2961,7 @@ static void UseSurfEffect_5(struct Task * task)
     if (ObjectEventClearHeldMovementIfFinished(objectEvent))
     {
         gPlayerAvatar.preventStep = FALSE;
-        gPlayerAvatar.flags &= 0xdf;
+        gPlayerAvatar.flags &= ~PLAYER_AVATAR_FLAG_CONTROLLABLE;
         ObjectEventSetHeldMovement(objectEvent, GetFaceDirectionMovementAction(objectEvent->movementDirection));
         sub_80DC44C(objectEvent->fieldEffectSpriteId, 1);
         UnfreezeObjectEvents();
@@ -2985,7 +2988,7 @@ static void (*const sUseVsSeekerEffectFuncs[])(struct Task * task) = {
 u32 FldEff_UseVsSeeker(void)
 {
     if (gQuestLogState == QL_STATE_RECORDING)
-        sub_811278C(8, 89);
+        QuestLogRecordPlayerAvatarGfxTransitionWithDuration(8, 89);
     CreateTask(Task_FldEffUseVsSeeker, 0xFF);
     return 0;
 }
@@ -3008,7 +3011,7 @@ static void UseVsSeekerEffect_2(struct Task * task)
     struct ObjectEvent * playerObj = &gObjectEvents[gPlayerAvatar.objectEventId];
     if (!ObjectEventIsMovementOverridden(playerObj) || ObjectEventClearHeldMovementIfFinished(playerObj))
     {
-        sub_805CBE8();
+        StartPlayerAvatarVsSeekerAnim();
         ObjectEventSetHeldMovement(playerObj, MOVEMENT_ACTION_START_ANIM_IN_DIRECTION);
         task->data[0]++;
     }
@@ -3020,11 +3023,11 @@ static void UseVsSeekerEffect_3(struct Task * task)
     if (ObjectEventClearHeldMovementIfFinished(playerObj))
     {
         if (gPlayerAvatar.flags & (PLAYER_AVATAR_FLAG_ACRO_BIKE | PLAYER_AVATAR_FLAG_MACH_BIKE))
-            ObjectEventSetGraphicsId(playerObj, GetPlayerAvatarGraphicsIdByStateId(1));
+            ObjectEventSetGraphicsId(playerObj, GetPlayerAvatarGraphicsIdByStateId(PLAYER_AVATAR_GFX_BIKE));
         else if (gPlayerAvatar.flags & PLAYER_AVATAR_FLAG_SURFING)
-            ObjectEventSetGraphicsId(playerObj, GetPlayerAvatarGraphicsIdByStateId(2));
+            ObjectEventSetGraphicsId(playerObj, GetPlayerAvatarGraphicsIdByStateId(PLAYER_AVATAR_GFX_RIDE));
         else
-            ObjectEventSetGraphicsId(playerObj, GetPlayerAvatarGraphicsIdByStateId(0));
+            ObjectEventSetGraphicsId(playerObj, GetPlayerAvatarGraphicsIdByStateId(PLAYER_AVATAR_GFX_NORMAL));
         ObjectEventForceSetHeldMovement(playerObj, GetFaceDirectionMovementAction(playerObj->facingDirection));
         task->data[0]++;
     }
@@ -3045,7 +3048,7 @@ static void sub_8086D94(struct Sprite * sprite);
 
 u8 FldEff_NpcFlyOut(void)
 {
-    u8 spriteId = CreateSprite(gFieldEffectObjectTemplatePointers[26], 0x78, 0, 1);
+    u8 spriteId = CreateSprite(gFieldEffectObjectTemplatePointers[FLDEFFOBJ_BIRD], 0x78, 0, 1);
     struct Sprite * sprite = &gSprites[spriteId];
 
     sprite->oam.paletteNum = 0;
@@ -3060,17 +3063,17 @@ static void sub_8086D94(struct Sprite * sprite)
 {
     struct Sprite * npcSprite;
 
-    sprite->pos2.x = Cos(sprite->data[2], 0x8c);
-    sprite->pos2.y = Sin(sprite->data[2], 0x48);
+    sprite->x2 = Cos(sprite->data[2], 0x8c);
+    sprite->y2 = Sin(sprite->data[2], 0x48);
     sprite->data[2] = (sprite->data[2] + 4) & 0xff;
     if (sprite->data[0])
     {
         npcSprite = &gSprites[sprite->data[1]];
         npcSprite->coordOffsetEnabled = FALSE;
-        npcSprite->pos1.x = sprite->pos1.x + sprite->pos2.x;
-        npcSprite->pos1.y = sprite->pos1.y + sprite->pos2.y - 8;
-        npcSprite->pos2.x = 0;
-        npcSprite->pos2.y = 0;
+        npcSprite->x = sprite->x + sprite->x2;
+        npcSprite->y = sprite->y + sprite->y2 - 8;
+        npcSprite->x2 = 0;
+        npcSprite->y2 = 0;
     }
     if (sprite->data[2] >= 0x80)
     {
@@ -3128,8 +3131,8 @@ static void UseFlyEffect_1(struct Task * task)
     {
         task->data[15] = gPlayerAvatar.flags;
         gPlayerAvatar.preventStep = TRUE;
-        SetPlayerAvatarStateMask(1);
-        sub_805CB70();
+        SetPlayerAvatarStateMask(PLAYER_AVATAR_FLAG_ON_FOOT);
+        StartPlayerAvatarSummonMonForFieldMoveAnim();
         ObjectEventSetHeldMovement(objectEvent, MOVEMENT_ACTION_START_ANIM_IN_DIRECTION);
         task->data[0]++;
     }
@@ -3188,7 +3191,7 @@ static void UseFlyEffect_6(struct Task * task)
     if ((++task->data[2]) >= 8)
     {
         struct ObjectEvent * objectEvent = &gObjectEvents[gPlayerAvatar.objectEventId];
-        ObjectEventSetGraphicsId(objectEvent, GetPlayerAvatarGraphicsIdByStateId(2));
+        ObjectEventSetGraphicsId(objectEvent, GetPlayerAvatarGraphicsIdByStateId(PLAYER_AVATAR_GFX_RIDE));
         StartSpriteAnim(&gSprites[objectEvent->spriteId], 0x16);
         objectEvent->inanimate = TRUE;
         ObjectEventSetHeldMovement(objectEvent, MOVEMENT_ACTION_JUMP_IN_PLACE_LEFT);
@@ -3236,7 +3239,7 @@ static u8 sub_8087168(void)
 {
     u8 spriteId;
     struct Sprite * sprite;
-    spriteId = CreateSprite(gFieldEffectObjectTemplatePointers[26], 0xff, 0xb4, 0x1);
+    spriteId = CreateSprite(gFieldEffectObjectTemplatePointers[FLDEFFOBJ_BIRD], 0xff, 0xb4, 0x1);
     sprite = &gSprites[spriteId];
     sprite->oam.paletteNum = 0;
     sprite->oam.priority = 1;
@@ -3254,10 +3257,10 @@ static void sub_80871C8(u8 spriteId)
     struct Sprite * sprite;
     sprite = &gSprites[spriteId];
     sprite->callback = sub_80872F0;
-    sprite->pos1.x = 0x78;
-    sprite->pos1.y = 0x00;
-    sprite->pos2.x = 0;
-    sprite->pos2.y = 0;
+    sprite->x = 0x78;
+    sprite->y = 0x00;
+    sprite->x2 = 0;
+    sprite->y2 = 0;
     memset(&sprite->data[0], 0, 8 * sizeof(u16) /* zero all data cells */);
     sprite->data[6] = 0x40;
 }
@@ -3295,17 +3298,17 @@ static void sub_8087220(struct Sprite * sprite)
             InitSpriteAffineAnim(sprite);
             StartSpriteAffineAnim(sprite, 0);
             if (gSaveBlock2Ptr->playerGender == MALE)
-                sprite->pos1.x = 0x80;
+                sprite->x = 0x80;
             else
-                sprite->pos1.x = 0x76;
-            sprite->pos1.y = -0x30;
+                sprite->x = 0x76;
+            sprite->y = -0x30;
             sprite->data[0]++;
             sprite->data[1] = 0x40;
             sprite->data[2] = 0x100;
         }
         sprite->data[1] += (sprite->data[2] >> 8);
-        sprite->pos2.x = Cos(sprite->data[1], 0x78);
-        sprite->pos2.y = Sin(sprite->data[1], 0x78);
+        sprite->x2 = Cos(sprite->data[1], 0x78);
+        sprite->y2 = Sin(sprite->data[1], 0x78);
         if (sprite->data[2] < 0x800)
         {
             sprite->data[2] += 0x60;
@@ -3322,17 +3325,17 @@ static void sub_8087220(struct Sprite * sprite)
 
 static void sub_80872F0(struct Sprite * sprite)
 {
-    sprite->pos2.x = Cos(sprite->data[2], 0x8c);
-    sprite->pos2.y = Sin(sprite->data[2], 0x48);
+    sprite->x2 = Cos(sprite->data[2], 0x8c);
+    sprite->y2 = Sin(sprite->data[2], 0x48);
     sprite->data[2] = (sprite->data[2] + 4) & 0xff;
     if (sprite->data[6] != MAX_SPRITES)
     {
         struct Sprite * sprite1 = &gSprites[sprite->data[6]];
         sprite1->coordOffsetEnabled = FALSE;
-        sprite1->pos1.x = sprite->pos1.x + sprite->pos2.x;
-        sprite1->pos1.y = sprite->pos1.y + sprite->pos2.y - 8;
-        sprite1->pos2.x = 0;
-        sprite1->pos2.y = 0;
+        sprite1->x = sprite->x + sprite->x2;
+        sprite1->y = sprite->y + sprite->y2 - 8;
+        sprite1->x2 = 0;
+        sprite1->y2 = 0;
     }
     if (sprite->data[2] >= 0x80)
     {
@@ -3351,10 +3354,10 @@ static void sub_8087364(struct Sprite * sprite)
             InitSpriteAffineAnim(sprite);
             StartSpriteAffineAnim(sprite, 1);
             if (gSaveBlock2Ptr->playerGender == MALE)
-                sprite->pos1.x = 0x70;
+                sprite->x = 0x70;
             else
-                sprite->pos1.x = 0x64;
-            sprite->pos1.y = -0x20;
+                sprite->x = 0x64;
+            sprite->y = -0x20;
             sprite->data[0]++;
             sprite->data[1] = 0xf0;
             sprite->data[2] = 0x800;
@@ -3363,8 +3366,8 @@ static void sub_8087364(struct Sprite * sprite)
         sprite->data[1] += sprite->data[2] >> 8;
         sprite->data[3] += sprite->data[2] >> 8;
         sprite->data[1] &= 0xff;
-        sprite->pos2.x = Cos(sprite->data[1], 0x20);
-        sprite->pos2.y = Sin(sprite->data[1], 0x78);
+        sprite->x2 = Cos(sprite->data[1], 0x20);
+        sprite->y2 = Sin(sprite->data[1], 0x78);
         if (sprite->data[2] > 0x100)
         {
             sprite->data[2] -= sprite->data[4];
@@ -3434,12 +3437,12 @@ static void FlyInEffect_1(struct Task * task)
         task->data[2] = 33;
         task->data[15] = gPlayerAvatar.flags;
         gPlayerAvatar.preventStep = TRUE;
-        SetPlayerAvatarStateMask(0x01);
-        if (task->data[15] & 0x08)
+        SetPlayerAvatarStateMask(PLAYER_AVATAR_FLAG_ON_FOOT);
+        if (task->data[15] & PLAYER_AVATAR_FLAG_SURFING)
         {
             sub_80DC44C(objectEvent->fieldEffectSpriteId, 0);
         }
-        ObjectEventSetGraphicsId(objectEvent, GetPlayerAvatarGraphicsIdByStateId(2));
+        ObjectEventSetGraphicsId(objectEvent, GetPlayerAvatarGraphicsIdByStateId(PLAYER_AVATAR_GFX_RIDE));
         CameraObjectReset2();
         ObjectEventTurn(objectEvent, DIR_WEST);
         StartSpriteAnim(&gSprites[objectEvent->spriteId], 0x16);
@@ -3463,10 +3466,10 @@ static void FlyInEffect_2(struct Task * task)
         objectEvent = &gObjectEvents[gPlayerAvatar.objectEventId];
         sprite = &gSprites[objectEvent->spriteId];
         sub_8087204(task->data[1], 0x40);
-        sprite->pos1.x += sprite->pos2.x;
-        sprite->pos1.y += sprite->pos2.y;
-        sprite->pos2.x = 0;
-        sprite->pos2.y = 0;
+        sprite->x += sprite->x2;
+        sprite->y += sprite->y2;
+        sprite->x2 = 0;
+        sprite->y2 = 0;
         task->data[0]++;
         task->data[2] = 0;
     }
@@ -3495,7 +3498,7 @@ static void FlyInEffect_3(struct Task * task)
         8
     };
     struct Sprite * sprite = &gSprites[gPlayerAvatar.spriteId];
-    sprite->pos2.y = gUnknown_83CC1F0[task->data[2]];
+    sprite->y2 = gUnknown_83CC1F0[task->data[2]];
     if ((++task->data[2]) >= 18)
     {
         task->data[0]++;
@@ -3512,10 +3515,10 @@ static void FlyInEffect_4(struct Task * task)
         sprite = &gSprites[objectEvent->spriteId];
         objectEvent->inanimate = FALSE;
         MoveObjectEventToMapCoords(objectEvent, objectEvent->currentCoords.x, objectEvent->currentCoords.y);
-        sprite->pos2.x = 0;
-        sprite->pos2.y = 0;
+        sprite->x2 = 0;
+        sprite->y2 = 0;
         sprite->coordOffsetEnabled = TRUE;
-        sub_805CB70();
+        StartPlayerAvatarSummonMonForFieldMoveAnim();
         ObjectEventSetHeldMovement(objectEvent, MOVEMENT_ACTION_START_ANIM_IN_DIRECTION);
         task->data[0]++;
     }
@@ -3547,10 +3550,10 @@ static void FlyInEffect_7(struct Task * task)
     if ((--task->data[1]) == 0)
     {
         objectEvent = &gObjectEvents[gPlayerAvatar.objectEventId];
-        state = 0;
-        if (task->data[15] & 0x08)
+        state = PLAYER_AVATAR_GFX_NORMAL;
+        if (task->data[15] & PLAYER_AVATAR_FLAG_SURFING)
         {
-            state = 2;
+            state = PLAYER_AVATAR_GFX_RIDE;
             sub_80DC44C(objectEvent->fieldEffectSpriteId, 1);
         }
         ObjectEventSetGraphicsId(objectEvent, GetPlayerAvatarGraphicsIdByStateId(state));
@@ -3589,18 +3592,18 @@ static void sub_80877FC(struct Sprite * sprite, u8 affineAnimId)
 static void sub_8087828(struct Sprite * sprite)
 {
     struct Sprite * sprite2;
-    sprite->pos2.x = Cos(sprite->data[2], 0xB4);
-    sprite->pos2.y = Sin(sprite->data[2], 0x48);
+    sprite->x2 = Cos(sprite->data[2], 0xB4);
+    sprite->y2 = Sin(sprite->data[2], 0x48);
     sprite->data[2] += 2;
     sprite->data[2] &= 0xFF;
     if (sprite->data[6] != MAX_SPRITES)
     {
         sprite2 = &gSprites[sprite->data[6]];
         sprite2->coordOffsetEnabled = FALSE;
-        sprite2->pos1.x = sprite->pos1.x + sprite->pos2.x;
-        sprite2->pos1.y = sprite->pos1.y + sprite->pos2.y - 8;
-        sprite2->pos2.x = 0;
-        sprite2->pos2.y = 0;
+        sprite2->x = sprite->x + sprite->x2;
+        sprite2->y = sprite->y + sprite->y2 - 8;
+        sprite2->x2 = 0;
+        sprite2->y2 = 0;
     }
     if (sprite->data[2] >= 0x80)
     {
@@ -3645,8 +3648,8 @@ u32 FldEff_MoveDeoxysRock(void)
         ShiftObjectEventCoords(objectEvent, gFieldEffectArguments[3] + 7, gFieldEffectArguments[4] + 7);
         taskId = CreateTask(Task_MoveDeoxysRock_Step, 0x50);
         gTasks[taskId].data[1] = objectEvent->spriteId;
-        gTasks[taskId].data[2] = gSprites[objectEvent->spriteId].pos1.x + x;
-        gTasks[taskId].data[3] = gSprites[objectEvent->spriteId].pos1.y + y;
+        gTasks[taskId].data[2] = gSprites[objectEvent->spriteId].x + x;
+        gTasks[taskId].data[3] = gSprites[objectEvent->spriteId].y + y;
         gTasks[taskId].data[8] = gFieldEffectArguments[5];
         gTasks[taskId].data[9] = objectEventIdBuffer;
     }
@@ -3661,10 +3664,12 @@ static void Task_MoveDeoxysRock_Step(u8 taskId)
     switch (data[0])
     {
     case 0:
-        data[4] = sprite->pos1.x << 4;
-        data[5] = sprite->pos1.y << 4;
-        data[6] = ((data[2] << 4) - data[4]) / data[8];
-        data[7] = ((data[3] << 4) - data[5]) / data[8];
+        data[4] = sprite->x << 4;
+        data[5] = sprite->y << 4;
+
+        // UB: Possible divide by zero
+        data[6] = SAFE_DIV(((data[2] << 4) - data[4]), data[8]);
+        data[7] = SAFE_DIV(((data[3] << 4) - data[5]), data[8]);
         data[0]++;
         // fallthrough
     case 1:
@@ -3673,14 +3678,14 @@ static void Task_MoveDeoxysRock_Step(u8 taskId)
             data[8]--;
             data[4] += data[6];
             data[5] += data[7];
-            sprite->pos1.x = data[4] >> 4;
-            sprite->pos1.y = data[5] >> 4;
+            sprite->x = data[4] >> 4;
+            sprite->y = data[5] >> 4;
         }
         else
         {
             objectEvent = &gObjectEvents[data[9]];
-            sprite->pos1.x = data[2];
-            sprite->pos1.y = data[3];
+            sprite->x = data[2];
+            sprite->y = data[3];
             ShiftStillObjectEventCoords(objectEvent);
             objectEvent->triggerGroundEffectsOnStop = TRUE;
             FieldEffectActiveListRemove(FLDEFF_MOVE_DEOXYS_ROCK);
@@ -3761,7 +3766,7 @@ u32 FldEff_Unk44(void)
     }
     else
     {
-        FieldEffectActiveListRemove(FLDEFF_UNK_44);
+        FieldEffectActiveListRemove(FLDEFF_DESTROY_DEOXYS_ROCK);
     }
     return FALSE;
 }
@@ -3843,7 +3848,7 @@ static void Unk44Effect_2(s16 *data, u8 taskId)
     {
         InstallCameraPanAheadCallback();
         RemoveObjectEventByLocalIdAndMap(data[6], data[7], data[8]);
-        FieldEffectActiveListRemove(FLDEFF_UNK_44);
+        FieldEffectActiveListRemove(FLDEFF_DESTROY_DEOXYS_ROCK);
         DestroyTask(taskId);
     }
 }
@@ -3851,8 +3856,8 @@ static void Unk44Effect_2(s16 *data, u8 taskId)
 static void sub_8087CFC(struct Sprite* sprite)
 {
     int i;
-    int xPos = (s16)gTotalCameraPixelOffsetX + sprite->pos1.x + sprite->pos2.x;
-    int yPos = (s16)gTotalCameraPixelOffsetY + sprite->pos1.y + sprite->pos2.y - 4;
+    int xPos = (s16)gTotalCameraPixelOffsetX + sprite->x + sprite->x2;
+    int yPos = (s16)gTotalCameraPixelOffsetY + sprite->y + sprite->y2 - 4;
 
     for (i = 0; i < 4; i++)
     {
@@ -3871,23 +3876,23 @@ static void SpriteCB_FldEffUnk44(struct Sprite* sprite)
     switch (sprite->data[0])
     {
     case 0:
-        sprite->pos1.x -= 16;
-        sprite->pos1.y -= 12;
+        sprite->x -= 16;
+        sprite->y -= 12;
         break;
     case 1:
-        sprite->pos1.x += 16;
-        sprite->pos1.y -= 12;
+        sprite->x += 16;
+        sprite->y -= 12;
         break;
     case 2:
-        sprite->pos1.x -= 16;
-        sprite->pos1.y += 12;
+        sprite->x -= 16;
+        sprite->y += 12;
         break;
     case 3:
-        sprite->pos1.x += 16;
-        sprite->pos1.y += 12;
+        sprite->x += 16;
+        sprite->y += 12;
         break;
     }
-    if (sprite->pos1.x < -4 || sprite->pos1.x > 0xF4 || sprite->pos1.y < -4 || sprite->pos1.y > 0xA4)
+    if (sprite->x < -4 || sprite->x > 0xF4 || sprite->y < -4 || sprite->y > 0xA4)
         DestroySprite(sprite);
 }
 

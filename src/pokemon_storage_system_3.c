@@ -25,8 +25,6 @@
 #include "constants/items.h"
 #include "constants/help_system.h"
 #include "constants/songs.h"
-#include "constants/flags.h"
-#include "constants/vars.h"
 
 EWRAM_DATA struct PokemonStorageSystemData *gPSSData = NULL;
 static EWRAM_DATA bool8 sInPartyMenu = 0;
@@ -2059,7 +2057,7 @@ static void Cb_ChangeScreen(u8 taskId)
         partyMon = gPSSData->field_218C.mon;
         monIndex = gPSSData->field_2187;
         maxMonIndex = gPSSData->field_2186;
-        mode = gPSSData->field_2188;
+        mode = gPSSData->summaryScreenMode;
         FreePSSData();
         ShowPokemonSummaryScreen(partyMon, monIndex, maxMonIndex, Cb2_ReturnToPSS, mode);
         break;
@@ -2168,8 +2166,8 @@ static void PSS_CreateMonMarkingSprite(void)
     gPSSData->monMarkingSprite = CreateMonMarkingSprite_AllOff(TAG_TILE_10, TAG_PAL_DAC8, NULL);
     gPSSData->monMarkingSprite->oam.priority = 1;
     gPSSData->monMarkingSprite->subpriority = 1;
-    gPSSData->monMarkingSprite->pos1.x = 40;
-    gPSSData->monMarkingSprite->pos1.y = 150;
+    gPSSData->monMarkingSprite->x = 40;
+    gPSSData->monMarkingSprite->y = 150;
     gPSSData->monMarkingSpriteTileStart = (void *)OBJ_VRAM0 + 32 * GetSpriteTileStartByTag(TAG_TILE_10);
 }
 

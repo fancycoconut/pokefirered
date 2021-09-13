@@ -23,9 +23,10 @@
 #include "text_window.h"
 #include "trig.h"
 #include "battle_string_ids.h"
-#include "constants/species.h"
 #include "constants/songs.h"
 #include "constants/pokemon.h"
+
+extern struct Evolution gEvolutionTable[][EVOS_PER_MON];
 
 struct EvoInfo
 {
@@ -60,17 +61,17 @@ static void Task_MovingBackgroundPos(u8 taskId);
 static void ResetBgRegsAfterMovingBackgroundCancel(void);
 
 // const data
-static const u16 sUnrefPal_83F6C90[] = INCBIN_U16("graphics/evolution_scene/unknown_5B4114.gbapal");
+static const u16 sUnusedPal[] = INCBIN_U16("graphics/evolution_scene/unused.gbapal");
 static const u32 sMovingBackgroundTiles[] = INCBIN_U32("graphics/evolution_scene/bg.4bpp.lz");
 static const u32 sMovingBackgroundMap1[] = INCBIN_U32("graphics/evolution_scene/bg.bin.lz");
 static const u32 sMovingBackgroundMap2[] = INCBIN_U32("graphics/evolution_scene/bg2.bin.lz");
 static const u16 sBlackPalette[] = INCBIN_U16("graphics/evolution_scene/gray_transition_intro.gbapal");
-static const u16 unref_83F7D80[] = INCBIN_U16("graphics/evolution_scene/unref_83F7D80.bin");
+static const u16 sUnusedTilemap[] = INCBIN_U16("graphics/evolution_scene/unused_tilemap.bin");
 static const u16 sMovingBgPals[] = INCBIN_U16("graphics/evolution_scene/transition.gbapal");
 
 static const u8 sText_ShedinjaJapaneseName[] = _("ヌケニン");
 
-static const u8 unref_83F8445[] = _("{COLOR RED}{HIGHLIGHT DARK_GREY}{SHADOW GREEN}");
+static const u8 unref_83F8445[] = _("{COLOR DARK_GRAY}{HIGHLIGHT WHITE}{SHADOW LIGHT_GRAY}");
 
 static const u8 unref_83F844F[][10] = {
     _("▶\n "),
@@ -546,8 +547,6 @@ static void CreateShedinja(u16 preEvoSpecies, struct Pokemon* mon)
     {
         s32 i;
         struct Pokemon* shedinja = &gPlayerParty[gPlayerPartyCount];
-        const struct Evolution *evos;
-        const struct Evolution *evos2;
 
         CopyMon(&gPlayerParty[gPlayerPartyCount], mon, sizeof(struct Pokemon));
         SetMonData(&gPlayerParty[gPlayerPartyCount], MON_DATA_SPECIES, (&gEvolutionTable[preEvoSpecies][1].targetSpecies));
@@ -558,7 +557,7 @@ static void CreateShedinja(u16 preEvoSpecies, struct Pokemon* mon)
 
         for (i = MON_DATA_COOL_RIBBON; i < MON_DATA_COOL_RIBBON + 5; i++)
             SetMonData(&gPlayerParty[gPlayerPartyCount], i, (&data));
-        for (i = MON_DATA_CHAMPION_RIBBON; i <= MON_DATA_FATEFUL_ENCOUNTER; i++)
+        for (i = MON_DATA_CHAMPION_RIBBON; i <= MON_DATA_FILLER; i++)
             SetMonData(&gPlayerParty[gPlayerPartyCount], i, (&data));
 
         SetMonData(&gPlayerParty[gPlayerPartyCount], MON_DATA_STATUS, (&data));
@@ -568,12 +567,8 @@ static void CreateShedinja(u16 preEvoSpecies, struct Pokemon* mon)
         CalculateMonStats(&gPlayerParty[gPlayerPartyCount]);
         CalculatePlayerPartyCount();
 
-        // can't match it otherwise, ehh
-        evos2 = gEvolutionTable[0];
-        evos = evos2 + EVOS_PER_MON * preEvoSpecies;
-
-        GetSetPokedexFlag(SpeciesToNationalPokedexNum(evos[1].targetSpecies), FLAG_SET_SEEN);
-        GetSetPokedexFlag(SpeciesToNationalPokedexNum(evos[1].targetSpecies), FLAG_SET_CAUGHT);
+        GetSetPokedexFlag(SpeciesToNationalPokedexNum(gEvolutionTable[preEvoSpecies][1].targetSpecies), FLAG_SET_SEEN);
+        GetSetPokedexFlag(SpeciesToNationalPokedexNum(gEvolutionTable[preEvoSpecies][1].targetSpecies), FLAG_SET_CAUGHT);
 
         if (GetMonData(shedinja, MON_DATA_SPECIES) == SPECIES_SHEDINJA
             && GetMonData(shedinja, MON_DATA_LANGUAGE) == LANGUAGE_JAPANESE

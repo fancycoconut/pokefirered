@@ -18,8 +18,6 @@
 #include "constants/event_object_movement.h"
 #include "constants/event_objects.h"
 
-#define NUM_FIELD_MAP_OBJECT_TEMPLATES 0x51
-
 static void MoveCoordsInDirection(u32, s16 *, s16 *, s16, s16);
 static bool8 ObjectEventExecSingleMovementAction(struct ObjectEvent *, struct Sprite *);
 static u8 GetCollisionInDirection(struct ObjectEvent *, u8);
@@ -30,7 +28,7 @@ static void UpdateObjectEventSpriteAnimPause(struct ObjectEvent *, struct Sprite
 static bool8 IsCoordOutsideObjectEventMovementRange(struct ObjectEvent *, s16, s16);
 static bool8 IsMetatileDirectionallyImpassable(struct ObjectEvent *, s16, s16, u8);
 static bool8 DoesObjectCollideWithObjectAt(struct ObjectEvent *, s16, s16);
-static void sub_8067A10(struct ObjectEvent *, struct Sprite *);
+static void CalcWhetherObjectIsOffscreen(struct ObjectEvent *, struct Sprite *);
 static void UpdateObjEventSpriteVisibility(struct ObjectEvent *, struct Sprite *);
 static void ObjectEventUpdateMetatileBehaviors(struct ObjectEvent*);
 static void GetGroundEffectFlags_Reflection(struct ObjectEvent*, u32*);
@@ -71,10 +69,10 @@ static void GetObjectEventMovingCameraOffset(s16 *, s16 *);
 static struct ObjectEventTemplate *GetObjectEventTemplateByLocalIdAndMap(u8, u8, u8);
 static void LoadObjectEventPalette(u16);
 static void RemoveObjectEventIfOutsideView(struct ObjectEvent *);
-static void sub_805EE3C(u8, s16, s16);
+static void ReloadMapObjectWithOffset(u8 objectEventId, s16 x, s16 y);
 static void SetPlayerAvatarObjectEventIdAndObjectId(u8, u8);
 static void sub_805EFF4(struct ObjectEvent *);
-static u8 sub_805F510(const struct SpritePalette *);
+static u8 TryLoadObjectPalette(const struct SpritePalette *spritePalette);
 static u8 FindObjectEventPaletteIndexByTag(u16);
 static bool8 ObjectEventDoesZCoordMatch(struct ObjectEvent *, u8);
 static void ObjectCB_CameraObject(struct Sprite *);
@@ -89,10 +87,10 @@ static bool8 sub_805E27C(struct ObjectEventTemplate *, s16, s16);
 static bool8 sub_805E2E8(struct ObjectEventTemplate *, s16, s16);
 static void sub_805E384(struct ObjectEventTemplate *);
 static bool8 MovementType_Disguise_Callback(struct ObjectEvent *, struct Sprite *);
-static bool8 MovementType_Hidden_Callback(struct ObjectEvent *, struct Sprite *);
-static u8 sub_8063304(struct ObjectEvent *, struct Sprite *);
-static u8 sub_8063324(struct ObjectEvent *, struct Sprite *);
-static u8 sub_8063344(struct ObjectEvent *, struct Sprite *);
+static bool8 MovementType_Buried_Callback(struct ObjectEvent *, struct Sprite *);
+static u8 MovementType_VsSeeker4D_Callback(struct ObjectEvent *, struct Sprite *);
+static u8 MovementType_VsSeeker4E_Callback(struct ObjectEvent *, struct Sprite *);
+static u8 MovementType_VsSeeker4F_Callback(struct ObjectEvent *, struct Sprite *);
 static void sub_8064544(struct ObjectEvent *, struct Sprite *);
 static void DoObjectUnionRoomWarpYDisplacement(struct Sprite * sprite);
 static void MovementType_None(struct Sprite *);
@@ -142,15 +140,15 @@ static void MovementType_CopyPlayer(struct Sprite *);
 static void MovementType_TreeDisguise(struct Sprite *);
 static void MovementType_MountainDisguise(struct Sprite *);
 static void MovementType_CopyPlayerInGrass(struct Sprite *);
-static void MovementType_Hidden(struct Sprite *);
+static void MovementType_Buried(struct Sprite *);
 static void MovementType_WalkInPlace(struct Sprite *);
 static void MovementType_WalkSlowlyInPlace(struct Sprite *);
 static void MovementType_JogInPlace(struct Sprite *);
 static void MovementType_Invisible(struct Sprite *);
-static void sub_8063298(struct Sprite *);
-static void sub_80632BC(struct Sprite *);
-static void sub_80632E0(struct Sprite *);
-static void MovementType_WanderAroundDuplicate(struct Sprite *);
+static void MovementType_VsSeeker4D(struct Sprite *);
+static void MovementType_VsSeeker4E(struct Sprite *);
+static void MovementType_VsSeeker4F(struct Sprite *);
+static void MovementType_WanderAroundSlowest(struct Sprite *);
 
 #define movement_type_def(setup, table)                                                          \
 static u8 setup##_callback(struct ObjectEvent *, struct Sprite *);                               \
@@ -177,11 +175,11 @@ static u8 setup##_callback(struct ObjectEvent *objectEvent, struct Sprite *sprit
 EWRAM_DATA u8 sCurrentReflectionType = 0;
 EWRAM_DATA u16 sCurrentSpecialObjectPaletteTag = 0;
 
-const u8 gReflectionEffectPaletteMap[] = {1, 1, 6, 7, 8, 9, 6, 7, 8, 9, 11, 11, 0, 0, 0, 0};
+const u8 gReflectionEffectPaletteMap[16] = {1, 1, 6, 7, 8, 9, 6, 7, 8, 9, 11, 11, 0, 0, 0, 0};
 
-const struct SpriteTemplate gCameraSpriteTemplate = {
+static const struct SpriteTemplate gCameraSpriteTemplate = {
     .tileTag = 0, 
-    .paletteTag = 0xFFFF, 
+    .paletteTag = SPRITE_INVALID_TAG,
     .oam = &gDummyOamData, 
     .anims = gDummySpriteAnimTable, 
     .images = NULL, 
@@ -197,91 +195,91 @@ void (*const gCameraObjectFuncs[])(struct Sprite *) = {
 
 #include "data/object_events/object_event_graphics.h"
 
-static void (*const sMovementTypeCallbacks[])(struct Sprite *) = {
-    MovementType_None,
-    MovementType_LookAround,
-    MovementType_WanderAround,
-    MovementType_WanderUpAndDown,
-    MovementType_WanderUpAndDown,
-    MovementType_WanderLeftAndRight,
-    MovementType_WanderLeftAndRight,
-    MovementType_FaceDirection,
-    MovementType_FaceDirection,
-    MovementType_FaceDirection,
-    MovementType_FaceDirection,
-    MovementType_Player,
-    NULL,
-    MovementType_FaceDownAndUp,
-    MovementType_FaceLeftAndRight,
-    MovementType_FaceUpAndLeft,
-    MovementType_FaceUpAndRight,
-    MovementType_FaceDownAndLeft,
-    MovementType_FaceDownAndRight,
-    MovementType_FaceDownUpAndLeft,
-    MovementType_FaceDownUpAndRight,
-    MovementType_FaceUpRightAndLeft,
-    MovementType_FaceDownRightAndLeft,
-    MovementType_RotateCounterclockwise,
-    MovementType_RotateClockwise,
-    MovementType_WalkBackAndForth,
-    MovementType_WalkBackAndForth,
-    MovementType_WalkBackAndForth,
-    MovementType_WalkBackAndForth,
-    MovementType_WalkSequenceUpRightLeftDown,
-    MovementType_WalkSequenceRightLeftDownUp,
-    MovementType_WalkSequenceDownUpRightLeft,
-    MovementType_WalkSequenceLeftDownUpRight,
-    MovementType_WalkSequenceUpLeftRightDown,
-    MovementType_WalkSequenceLeftRightDownUp,
-    MovementType_WalkSequenceDownUpLeftRight,
-    MovementType_WalkSequenceRightDownUpLeft,
-    MovementType_WalkSequenceLeftUpDownRight,
-    MovementType_WalkSequenceUpDownRightLeft,
-    MovementType_WalkSequenceRightLeftUpDown,
-    MovementType_WalkSequenceDownRightLeftUp,
-    MovementType_WalkSequenceRightUpDownLeft,
-    MovementType_WalkSequenceUpDownLeftRight,
-    MovementType_WalkSequenceLeftRightUpDown,
-    MovementType_WalkSequenceDownLeftRightUp,
-    MovementType_WalkSequenceUpLeftDownRight,
-    MovementType_WalkSequenceDownRightUpLeft,
-    MovementType_WalkSequenceLeftDownRightUp,
-    MovementType_WalkSequenceRightUpLeftDown,
-    MovementType_WalkSequenceUpRightDownLeft,
-    MovementType_WalkSequenceDownLeftUpRight,
-    MovementType_WalkSequenceLeftUpRightDown,
-    MovementType_WalkSequenceRightDownLeftUp,
-    MovementType_CopyPlayer,
-    MovementType_CopyPlayer,
-    MovementType_CopyPlayer,
-    MovementType_CopyPlayer,
-    MovementType_TreeDisguise,
-    MovementType_MountainDisguise,
-    MovementType_CopyPlayerInGrass,
-    MovementType_CopyPlayerInGrass,
-    MovementType_CopyPlayerInGrass,
-    MovementType_CopyPlayerInGrass,
-    MovementType_Hidden,
-    MovementType_WalkInPlace,
-    MovementType_WalkInPlace,
-    MovementType_WalkInPlace,
-    MovementType_WalkInPlace,
-    MovementType_WalkSlowlyInPlace,
-    MovementType_WalkSlowlyInPlace,
-    MovementType_WalkSlowlyInPlace,
-    MovementType_WalkSlowlyInPlace,
-    MovementType_JogInPlace,
-    MovementType_JogInPlace,
-    MovementType_JogInPlace,
-    MovementType_JogInPlace,
-    MovementType_Invisible,
-    sub_8063298,
-    sub_80632BC,
-    sub_80632E0,
-    MovementType_WanderAroundDuplicate,
+static void (*const sMovementTypeCallbacks[MOVEMENT_TYPES_COUNT])(struct Sprite *) = {
+    [MOVEMENT_TYPE_NONE]                                  = MovementType_None,
+    [MOVEMENT_TYPE_LOOK_AROUND]                           = MovementType_LookAround,
+    [MOVEMENT_TYPE_WANDER_AROUND]                         = MovementType_WanderAround,
+    [MOVEMENT_TYPE_WANDER_UP_AND_DOWN]                    = MovementType_WanderUpAndDown,
+    [MOVEMENT_TYPE_WANDER_DOWN_AND_UP]                    = MovementType_WanderUpAndDown,
+    [MOVEMENT_TYPE_WANDER_LEFT_AND_RIGHT]                 = MovementType_WanderLeftAndRight,
+    [MOVEMENT_TYPE_WANDER_RIGHT_AND_LEFT]                 = MovementType_WanderLeftAndRight,
+    [MOVEMENT_TYPE_FACE_UP]                               = MovementType_FaceDirection,
+    [MOVEMENT_TYPE_FACE_DOWN]                             = MovementType_FaceDirection,
+    [MOVEMENT_TYPE_FACE_LEFT]                             = MovementType_FaceDirection,
+    [MOVEMENT_TYPE_FACE_RIGHT]                            = MovementType_FaceDirection,
+    [MOVEMENT_TYPE_PLAYER]                                = MovementType_Player,
+    [MOVEMENT_TYPE_BERRY_TREE_GROWTH]                     = NULL,
+    [MOVEMENT_TYPE_FACE_DOWN_AND_UP]                      = MovementType_FaceDownAndUp,
+    [MOVEMENT_TYPE_FACE_LEFT_AND_RIGHT]                   = MovementType_FaceLeftAndRight,
+    [MOVEMENT_TYPE_FACE_UP_AND_LEFT]                      = MovementType_FaceUpAndLeft,
+    [MOVEMENT_TYPE_FACE_UP_AND_RIGHT]                     = MovementType_FaceUpAndRight,
+    [MOVEMENT_TYPE_FACE_DOWN_AND_LEFT]                    = MovementType_FaceDownAndLeft,
+    [MOVEMENT_TYPE_FACE_DOWN_AND_RIGHT]                   = MovementType_FaceDownAndRight,
+    [MOVEMENT_TYPE_FACE_DOWN_UP_AND_LEFT]                 = MovementType_FaceDownUpAndLeft,
+    [MOVEMENT_TYPE_FACE_DOWN_UP_AND_RIGHT]                = MovementType_FaceDownUpAndRight,
+    [MOVEMENT_TYPE_FACE_UP_LEFT_AND_RIGHT]                = MovementType_FaceUpRightAndLeft,
+    [MOVEMENT_TYPE_FACE_DOWN_LEFT_AND_RIGHT]              = MovementType_FaceDownRightAndLeft,
+    [MOVEMENT_TYPE_ROTATE_COUNTERCLOCKWISE]               = MovementType_RotateCounterclockwise,
+    [MOVEMENT_TYPE_ROTATE_CLOCKWISE]                      = MovementType_RotateClockwise,
+    [MOVEMENT_TYPE_WALK_UP_AND_DOWN]                      = MovementType_WalkBackAndForth,
+    [MOVEMENT_TYPE_WALK_DOWN_AND_UP]                      = MovementType_WalkBackAndForth,
+    [MOVEMENT_TYPE_WALK_LEFT_AND_RIGHT]                   = MovementType_WalkBackAndForth,
+    [MOVEMENT_TYPE_WALK_RIGHT_AND_LEFT]                   = MovementType_WalkBackAndForth,
+    [MOVEMENT_TYPE_WALK_SEQUENCE_UP_RIGHT_LEFT_DOWN]      = MovementType_WalkSequenceUpRightLeftDown,
+    [MOVEMENT_TYPE_WALK_SEQUENCE_RIGHT_LEFT_DOWN_UP]      = MovementType_WalkSequenceRightLeftDownUp,
+    [MOVEMENT_TYPE_WALK_SEQUENCE_DOWN_UP_RIGHT_LEFT]      = MovementType_WalkSequenceDownUpRightLeft,
+    [MOVEMENT_TYPE_WALK_SEQUENCE_LEFT_DOWN_UP_RIGHT]      = MovementType_WalkSequenceLeftDownUpRight,
+    [MOVEMENT_TYPE_WALK_SEQUENCE_UP_LEFT_RIGHT_DOWN]      = MovementType_WalkSequenceUpLeftRightDown,
+    [MOVEMENT_TYPE_WALK_SEQUENCE_LEFT_RIGHT_DOWN_UP]      = MovementType_WalkSequenceLeftRightDownUp,
+    [MOVEMENT_TYPE_WALK_SEQUENCE_DOWN_UP_LEFT_RIGHT]      = MovementType_WalkSequenceDownUpLeftRight,
+    [MOVEMENT_TYPE_WALK_SEQUENCE_RIGHT_DOWN_UP_LEFT]      = MovementType_WalkSequenceRightDownUpLeft,
+    [MOVEMENT_TYPE_WALK_SEQUENCE_LEFT_UP_DOWN_RIGHT]      = MovementType_WalkSequenceLeftUpDownRight,
+    [MOVEMENT_TYPE_WALK_SEQUENCE_UP_DOWN_RIGHT_LEFT]      = MovementType_WalkSequenceUpDownRightLeft,
+    [MOVEMENT_TYPE_WALK_SEQUENCE_RIGHT_LEFT_UP_DOWN]      = MovementType_WalkSequenceRightLeftUpDown,
+    [MOVEMENT_TYPE_WALK_SEQUENCE_DOWN_RIGHT_LEFT_UP]      = MovementType_WalkSequenceDownRightLeftUp,
+    [MOVEMENT_TYPE_WALK_SEQUENCE_RIGHT_UP_DOWN_LEFT]      = MovementType_WalkSequenceRightUpDownLeft,
+    [MOVEMENT_TYPE_WALK_SEQUENCE_UP_DOWN_LEFT_RIGHT]      = MovementType_WalkSequenceUpDownLeftRight,
+    [MOVEMENT_TYPE_WALK_SEQUENCE_LEFT_RIGHT_UP_DOWN]      = MovementType_WalkSequenceLeftRightUpDown,
+    [MOVEMENT_TYPE_WALK_SEQUENCE_DOWN_LEFT_RIGHT_UP]      = MovementType_WalkSequenceDownLeftRightUp,
+    [MOVEMENT_TYPE_WALK_SEQUENCE_UP_LEFT_DOWN_RIGHT]      = MovementType_WalkSequenceUpLeftDownRight,
+    [MOVEMENT_TYPE_WALK_SEQUENCE_DOWN_RIGHT_UP_LEFT]      = MovementType_WalkSequenceDownRightUpLeft,
+    [MOVEMENT_TYPE_WALK_SEQUENCE_LEFT_DOWN_RIGHT_UP]      = MovementType_WalkSequenceLeftDownRightUp,
+    [MOVEMENT_TYPE_WALK_SEQUENCE_RIGHT_UP_LEFT_DOWN]      = MovementType_WalkSequenceRightUpLeftDown,
+    [MOVEMENT_TYPE_WALK_SEQUENCE_UP_RIGHT_DOWN_LEFT]      = MovementType_WalkSequenceUpRightDownLeft,
+    [MOVEMENT_TYPE_WALK_SEQUENCE_DOWN_LEFT_UP_RIGHT]      = MovementType_WalkSequenceDownLeftUpRight,
+    [MOVEMENT_TYPE_WALK_SEQUENCE_LEFT_UP_RIGHT_DOWN]      = MovementType_WalkSequenceLeftUpRightDown,
+    [MOVEMENT_TYPE_WALK_SEQUENCE_RIGHT_DOWN_LEFT_UP]      = MovementType_WalkSequenceRightDownLeftUp,
+    [MOVEMENT_TYPE_COPY_PLAYER]                           = MovementType_CopyPlayer,
+    [MOVEMENT_TYPE_COPY_PLAYER_OPPOSITE]                  = MovementType_CopyPlayer,
+    [MOVEMENT_TYPE_COPY_PLAYER_COUNTERCLOCKWISE]          = MovementType_CopyPlayer,
+    [MOVEMENT_TYPE_COPY_PLAYER_CLOCKWISE]                 = MovementType_CopyPlayer,
+    [MOVEMENT_TYPE_TREE_DISGUISE]                         = MovementType_TreeDisguise,
+    [MOVEMENT_TYPE_MOUNTAIN_DISGUISE]                     = MovementType_MountainDisguise,
+    [MOVEMENT_TYPE_COPY_PLAYER_IN_GRASS]                  = MovementType_CopyPlayerInGrass,
+    [MOVEMENT_TYPE_COPY_PLAYER_OPPOSITE_IN_GRASS]         = MovementType_CopyPlayerInGrass,
+    [MOVEMENT_TYPE_COPY_PLAYER_COUNTERCLOCKWISE_IN_GRASS] = MovementType_CopyPlayerInGrass,
+    [MOVEMENT_TYPE_COPY_PLAYER_CLOCKWISE_IN_GRASS]        = MovementType_CopyPlayerInGrass,
+    [MOVEMENT_TYPE_BURIED]                                = MovementType_Buried,
+    [MOVEMENT_TYPE_WALK_IN_PLACE_DOWN]                    = MovementType_WalkInPlace,
+    [MOVEMENT_TYPE_WALK_IN_PLACE_UP]                      = MovementType_WalkInPlace,
+    [MOVEMENT_TYPE_WALK_IN_PLACE_LEFT]                    = MovementType_WalkInPlace,
+    [MOVEMENT_TYPE_WALK_IN_PLACE_RIGHT]                   = MovementType_WalkInPlace,
+    [MOVEMENT_TYPE_WALK_SLOWLY_IN_PLACE_DOWN]             = MovementType_WalkSlowlyInPlace,
+    [MOVEMENT_TYPE_WALK_SLOWLY_IN_PLACE_UP]               = MovementType_WalkSlowlyInPlace,
+    [MOVEMENT_TYPE_WALK_SLOWLY_IN_PLACE_LEFT]             = MovementType_WalkSlowlyInPlace,
+    [MOVEMENT_TYPE_WALK_SLOWLY_IN_PLACE_RIGHT]            = MovementType_WalkSlowlyInPlace,
+    [MOVEMENT_TYPE_JOG_IN_PLACE_DOWN]                     = MovementType_JogInPlace,
+    [MOVEMENT_TYPE_JOG_IN_PLACE_UP]                       = MovementType_JogInPlace,
+    [MOVEMENT_TYPE_JOG_IN_PLACE_LEFT]                     = MovementType_JogInPlace,
+    [MOVEMENT_TYPE_JOG_IN_PLACE_RIGHT]                    = MovementType_JogInPlace,
+    [MOVEMENT_TYPE_INVISIBLE]                             = MovementType_Invisible,
+    [MOVEMENT_TYPE_VS_SEEKER_4D]                          = MovementType_VsSeeker4D,
+    [MOVEMENT_TYPE_VS_SEEKER_4E]                          = MovementType_VsSeeker4E,
+    [MOVEMENT_TYPE_VS_SEEKER_4F]                          = MovementType_VsSeeker4F,
+    [MOVEMENT_TYPE_WANDER_AROUND_SLOWEST]                 = MovementType_WanderAroundSlowest,
 };
 
-const bool8 gRangedMovementTypes[NUM_FIELD_MAP_OBJECT_TEMPLATES] = {
+static const bool8 gRangedMovementTypes[MOVEMENT_TYPES_COUNT] = {
     [MOVEMENT_TYPE_NONE] = FALSE,
     [MOVEMENT_TYPE_LOOK_AROUND] = FALSE,
     [MOVEMENT_TYPE_WANDER_AROUND] = TRUE,
@@ -345,27 +343,27 @@ const bool8 gRangedMovementTypes[NUM_FIELD_MAP_OBJECT_TEMPLATES] = {
     [MOVEMENT_TYPE_COPY_PLAYER_OPPOSITE_IN_GRASS] = TRUE,
     [MOVEMENT_TYPE_COPY_PLAYER_COUNTERCLOCKWISE_IN_GRASS] = TRUE,
     [MOVEMENT_TYPE_COPY_PLAYER_CLOCKWISE_IN_GRASS] = TRUE,
-    [MOVEMENT_TYPE_HIDDEN] = FALSE,
+    [MOVEMENT_TYPE_BURIED] = FALSE,
     [MOVEMENT_TYPE_WALK_IN_PLACE_DOWN] = FALSE,
     [MOVEMENT_TYPE_WALK_IN_PLACE_UP] = FALSE,
     [MOVEMENT_TYPE_WALK_IN_PLACE_LEFT] = FALSE,
     [MOVEMENT_TYPE_WALK_IN_PLACE_RIGHT] = FALSE,
+    [MOVEMENT_TYPE_WALK_SLOWLY_IN_PLACE_DOWN] = FALSE,
+    [MOVEMENT_TYPE_WALK_SLOWLY_IN_PLACE_UP] = FALSE,
+    [MOVEMENT_TYPE_WALK_SLOWLY_IN_PLACE_LEFT] = FALSE,
+    [MOVEMENT_TYPE_WALK_SLOWLY_IN_PLACE_RIGHT] = FALSE,
     [MOVEMENT_TYPE_JOG_IN_PLACE_DOWN] = FALSE,
     [MOVEMENT_TYPE_JOG_IN_PLACE_UP] = FALSE,
     [MOVEMENT_TYPE_JOG_IN_PLACE_LEFT] = FALSE,
     [MOVEMENT_TYPE_JOG_IN_PLACE_RIGHT] = FALSE,
-    [MOVEMENT_TYPE_RUN_IN_PLACE_DOWN] = FALSE,
-    [MOVEMENT_TYPE_RUN_IN_PLACE_UP] = FALSE,
-    [MOVEMENT_TYPE_RUN_IN_PLACE_LEFT] = FALSE,
-    [MOVEMENT_TYPE_RUN_IN_PLACE_RIGHT] = FALSE,
     [MOVEMENT_TYPE_INVISIBLE] = FALSE,
-    [MOVEMENT_TYPE_WALK_SLOWLY_IN_PLACE_DOWN] = FALSE,
-    [MOVEMENT_TYPE_WALK_SLOWLY_IN_PLACE_UP] = FALSE,
-    [MOVEMENT_TYPE_WALK_SLOWLY_IN_PLACE_LEFT] = FALSE,
-    [MOVEMENT_TYPE_WALK_SLOWLY_IN_PLACE_RIGHT] = TRUE,
+    [MOVEMENT_TYPE_VS_SEEKER_4D] = FALSE,
+    [MOVEMENT_TYPE_VS_SEEKER_4E] = FALSE,
+    [MOVEMENT_TYPE_VS_SEEKER_4F] = FALSE,
+    [MOVEMENT_TYPE_WANDER_AROUND_SLOWEST] = TRUE,
 };
 
-const u8 gInitialMovementTypeFacingDirections[NUM_FIELD_MAP_OBJECT_TEMPLATES] = {
+static const u8 gInitialMovementTypeFacingDirections[MOVEMENT_TYPES_COUNT] = {
     [MOVEMENT_TYPE_NONE] = DIR_SOUTH,
     [MOVEMENT_TYPE_LOOK_AROUND] = DIR_SOUTH,
     [MOVEMENT_TYPE_WANDER_AROUND] = DIR_SOUTH,
@@ -429,62 +427,55 @@ const u8 gInitialMovementTypeFacingDirections[NUM_FIELD_MAP_OBJECT_TEMPLATES] = 
     [MOVEMENT_TYPE_COPY_PLAYER_OPPOSITE_IN_GRASS] = DIR_SOUTH,
     [MOVEMENT_TYPE_COPY_PLAYER_COUNTERCLOCKWISE_IN_GRASS] = DIR_WEST,
     [MOVEMENT_TYPE_COPY_PLAYER_CLOCKWISE_IN_GRASS] = DIR_EAST,
-    [MOVEMENT_TYPE_HIDDEN] = DIR_SOUTH,
+    [MOVEMENT_TYPE_BURIED] = DIR_SOUTH,
     [MOVEMENT_TYPE_WALK_IN_PLACE_DOWN] = DIR_SOUTH,
     [MOVEMENT_TYPE_WALK_IN_PLACE_UP] = DIR_NORTH,
     [MOVEMENT_TYPE_WALK_IN_PLACE_LEFT] = DIR_WEST,
     [MOVEMENT_TYPE_WALK_IN_PLACE_RIGHT] = DIR_EAST,
+    [MOVEMENT_TYPE_WALK_SLOWLY_IN_PLACE_DOWN] = DIR_SOUTH,
+    [MOVEMENT_TYPE_WALK_SLOWLY_IN_PLACE_UP] = DIR_NORTH,
+    [MOVEMENT_TYPE_WALK_SLOWLY_IN_PLACE_LEFT] = DIR_WEST,
+    [MOVEMENT_TYPE_WALK_SLOWLY_IN_PLACE_RIGHT] = DIR_EAST,
     [MOVEMENT_TYPE_JOG_IN_PLACE_DOWN] = DIR_SOUTH,
     [MOVEMENT_TYPE_JOG_IN_PLACE_UP] = DIR_NORTH,
     [MOVEMENT_TYPE_JOG_IN_PLACE_LEFT] = DIR_WEST,
     [MOVEMENT_TYPE_JOG_IN_PLACE_RIGHT] = DIR_EAST,
-    [MOVEMENT_TYPE_RUN_IN_PLACE_DOWN] = DIR_SOUTH,
-    [MOVEMENT_TYPE_RUN_IN_PLACE_UP] = DIR_NORTH,
-    [MOVEMENT_TYPE_RUN_IN_PLACE_LEFT] = DIR_WEST,
-    [MOVEMENT_TYPE_RUN_IN_PLACE_RIGHT] = DIR_EAST,
     [MOVEMENT_TYPE_INVISIBLE] = DIR_SOUTH,
-    [MOVEMENT_TYPE_WALK_SLOWLY_IN_PLACE_DOWN] = DIR_SOUTH,
-    [MOVEMENT_TYPE_WALK_SLOWLY_IN_PLACE_UP] = DIR_SOUTH,
-    [MOVEMENT_TYPE_WALK_SLOWLY_IN_PLACE_LEFT] = DIR_SOUTH,
-    [MOVEMENT_TYPE_WALK_SLOWLY_IN_PLACE_RIGHT] = DIR_SOUTH,
+    [MOVEMENT_TYPE_VS_SEEKER_4D] = DIR_SOUTH,
+    [MOVEMENT_TYPE_VS_SEEKER_4E] = DIR_SOUTH,
+    [MOVEMENT_TYPE_VS_SEEKER_4F] = DIR_SOUTH,
+    [MOVEMENT_TYPE_WANDER_AROUND_SLOWEST] = DIR_SOUTH,
 };
 
-#define OBJ_EVENT_PAL_TAG_0  0x1103
-#define OBJ_EVENT_PAL_TAG_1  0x1104
-#define OBJ_EVENT_PAL_TAG_2  0x1105
-#define OBJ_EVENT_PAL_TAG_3  0x1106
-#define OBJ_EVENT_PAL_TAG_4  0x1107
-#define OBJ_EVENT_PAL_TAG_5  0x1108
-#define OBJ_EVENT_PAL_TAG_6  0x1109
-#define OBJ_EVENT_PAL_TAG_7  0x110A
-#define OBJ_EVENT_PAL_TAG_8  0x1100
-#define OBJ_EVENT_PAL_TAG_9  0x1101
-#define OBJ_EVENT_PAL_TAG_10 0x1102
-#define OBJ_EVENT_PAL_TAG_11 0x1115
-#define OBJ_EVENT_PAL_TAG_12 0x110B
-#define OBJ_EVENT_PAL_TAG_13 0x110C
-#define OBJ_EVENT_PAL_TAG_14 0x110D
-#define OBJ_EVENT_PAL_TAG_15 0x110E
-#define OBJ_EVENT_PAL_TAG_16 0x110F
-#define OBJ_EVENT_PAL_TAG_17 0x1110
-#define OBJ_EVENT_PAL_TAG_18 0x1111
-#define OBJ_EVENT_PAL_TAG_19 0x1112
-#define OBJ_EVENT_PAL_TAG_20 0x1113
-#define OBJ_EVENT_PAL_TAG_21 0x1114
-#define OBJ_EVENT_PAL_TAG_22 0x1116
-#define OBJ_EVENT_PAL_TAG_23 0x1117
-#define OBJ_EVENT_PAL_TAG_24 0x1118
-#define OBJ_EVENT_PAL_TAG_25 0x1119
-#define OBJ_EVENT_PAL_TAG_26 0x111B
-#define OBJ_EVENT_PAL_TAG_27 0x111C
-#define OBJ_EVENT_PAL_TAG_28 0x111D
-#define OBJ_EVENT_PAL_TAG_29 0x111E
-#define OBJ_EVENT_PAL_TAG_30 0x111F
-#define OBJ_EVENT_PAL_TAG_31 0x1120
-#define OBJ_EVENT_PAL_TAG_32 0x1121
-#define OBJ_EVENT_PAL_TAG_33 0x1122
-#define OBJ_EVENT_PAL_TAG_34 0x1123
-#define OBJ_EVENT_PAL_TAG_NONE 0x11FF
+#define OBJ_EVENT_PAL_TAG_PLAYER_RED                  0x1100
+#define OBJ_EVENT_PAL_TAG_PLAYER_RED_REFLECTION       0x1101
+#define OBJ_EVENT_PAL_TAG_BRIDGE_REFLECTION           0x1102
+#define OBJ_EVENT_PAL_TAG_NPC_BLUE                    0x1103
+#define OBJ_EVENT_PAL_TAG_NPC_PINK                    0x1104
+#define OBJ_EVENT_PAL_TAG_NPC_GREEN                   0x1105
+#define OBJ_EVENT_PAL_TAG_NPC_WHITE                   0x1106
+#define OBJ_EVENT_PAL_TAG_NPC_BLUE_REFLECTION         0x1107
+#define OBJ_EVENT_PAL_TAG_NPC_PINK_REFLECTION         0x1108
+#define OBJ_EVENT_PAL_TAG_NPC_GREEN_REFLECTION        0x1109
+#define OBJ_EVENT_PAL_TAG_NPC_WHITE_REFLECTION        0x110A
+#define OBJ_EVENT_PAL_TAG_RS_QUINTY_PLUMP             0x110B
+#define OBJ_EVENT_PAL_TAG_RS_QUINTY_PLUMP_REFLECTION  0x110C
+#define OBJ_EVENT_PAL_TAG_RS_TRUCK                    0x110D
+#define OBJ_EVENT_PAL_TAG_RS_MACHOKE                  0x110E
+#define OBJ_EVENT_PAL_TAG_RS_POOCHYENA                0x110F
+#define OBJ_EVENT_PAL_TAG_PLAYER_GREEN                0x1110
+#define OBJ_EVENT_PAL_TAG_PLAYER_GREEN_REFLECTION     0x1111
+#define OBJ_EVENT_PAL_TAG_RS_MOVING_BOX               0x1112
+#define OBJ_EVENT_PAL_TAG_METEORITE                   0x1113
+#define OBJ_EVENT_PAL_TAG_SEAGALLOP                   0x1114
+#define OBJ_EVENT_PAL_TAG_SS_ANNE                     0x1115
+#define OBJ_EVENT_PAL_TAG_RS_PLAYER_UNDERWATER        0x1116
+#define OBJ_EVENT_PAL_TAG_RS_KYOGRE                   0x1117
+#define OBJ_EVENT_PAL_TAG_RS_KYOGRE_REFLECTION        0x1118
+#define OBJ_EVENT_PAL_TAG_RS_GROUDON                  0x1119
+#define OBJ_EVENT_PAL_TAG_RS_GROUDON_REFLECTION       0x111A
+#define OBJ_EVENT_PAL_TAG_RS_SUBMARINE_SHADOW         0x111B
+#define OBJ_EVENT_PAL_TAG_NONE                        0x11FF
 
 #include "data/object_events/object_event_graphics_info_pointers.h"
 #include "data/field_effects/field_effect_object_template_pointers.h"
@@ -495,207 +486,210 @@ const u8 gInitialMovementTypeFacingDirections[NUM_FIELD_MAP_OBJECT_TEMPLATES] = 
 #include "data/object_events/object_event_graphics_info.h"
 
 static const struct SpritePalette sObjectEventSpritePalettes[] = {
-    {gUnknown_836D828, OBJ_EVENT_PAL_TAG_0},
-    {gUnknown_836D848, OBJ_EVENT_PAL_TAG_1},
-    {gUnknown_836D868, OBJ_EVENT_PAL_TAG_2},
-    {gUnknown_836D888, OBJ_EVENT_PAL_TAG_3},
-    {gUnknown_836D8A8, OBJ_EVENT_PAL_TAG_4},
-    {gUnknown_836D8C8, OBJ_EVENT_PAL_TAG_5},
-    {gUnknown_836D8E8, OBJ_EVENT_PAL_TAG_6},
-    {gUnknown_836D908, OBJ_EVENT_PAL_TAG_7},
-    {gUnknown_835B968, OBJ_EVENT_PAL_TAG_8},
-    {gUnknown_835E968, OBJ_EVENT_PAL_TAG_9},
-    {gUnknown_835E988, OBJ_EVENT_PAL_TAG_10},
-    {gUnknown_8398008, OBJ_EVENT_PAL_TAG_12},
-    {gUnknown_8398028, OBJ_EVENT_PAL_TAG_13},
-    {gUnknown_835B968, OBJ_EVENT_PAL_TAG_17},
-    {gUnknown_835E968, OBJ_EVENT_PAL_TAG_18},
-    {gUnknown_8394EA8, OBJ_EVENT_PAL_TAG_20},
-    {gUnknown_8395AE8, OBJ_EVENT_PAL_TAG_11},
-    {gUnknown_83952C8, OBJ_EVENT_PAL_TAG_21},
+    {gObjectEventPal_NpcBlue,                 OBJ_EVENT_PAL_TAG_NPC_BLUE},
+    {gObjectEventPal_NpcPink,                 OBJ_EVENT_PAL_TAG_NPC_PINK},
+    {gObjectEventPal_NpcGreen,                OBJ_EVENT_PAL_TAG_NPC_GREEN},
+    {gObjectEventPal_NpcWhite,                OBJ_EVENT_PAL_TAG_NPC_WHITE},
+    {gObjectEventPal_NpcBlueReflection,       OBJ_EVENT_PAL_TAG_NPC_BLUE_REFLECTION},
+    {gObjectEventPal_NpcPinkReflection,       OBJ_EVENT_PAL_TAG_NPC_PINK_REFLECTION},
+    {gObjectEventPal_NpcGreenReflection,      OBJ_EVENT_PAL_TAG_NPC_GREEN_REFLECTION},
+    {gObjectEventPal_NpcWhiteReflection,      OBJ_EVENT_PAL_TAG_NPC_WHITE_REFLECTION},
+    {gObjectEventPal_Player,                  OBJ_EVENT_PAL_TAG_PLAYER_RED},
+    {gObjectEventPal_PlayerReflection,        OBJ_EVENT_PAL_TAG_PLAYER_RED_REFLECTION},
+    {gObjectEventPal_BridgeReflection,        OBJ_EVENT_PAL_TAG_BRIDGE_REFLECTION},
+    {gObjectEventPal_RSQuintyPlump,           OBJ_EVENT_PAL_TAG_RS_QUINTY_PLUMP},
+    {gObjectEventPal_RSQuintyPlumpReflection, OBJ_EVENT_PAL_TAG_RS_QUINTY_PLUMP_REFLECTION},
+    {gObjectEventPal_Player,                  OBJ_EVENT_PAL_TAG_PLAYER_GREEN},
+    {gObjectEventPal_PlayerReflection,        OBJ_EVENT_PAL_TAG_PLAYER_GREEN_REFLECTION},
+    {gObjectEventPal_Meteorite,               OBJ_EVENT_PAL_TAG_METEORITE},
+    {gObjectEventPal_SSAnne,                  OBJ_EVENT_PAL_TAG_SS_ANNE},
+    {gObjectEventPal_Seagallop,               OBJ_EVENT_PAL_TAG_SEAGALLOP},
     {},
 };
 
-const u16 gPlayerReflectionPaletteTags[] = {
-    OBJ_EVENT_PAL_TAG_9,
-    OBJ_EVENT_PAL_TAG_9,
-    OBJ_EVENT_PAL_TAG_9,
-    OBJ_EVENT_PAL_TAG_9,
-    OBJ_EVENT_PAL_TAG_18,
-    OBJ_EVENT_PAL_TAG_18,
-    OBJ_EVENT_PAL_TAG_18,
-    OBJ_EVENT_PAL_TAG_18,
+static const u16 sPlayerReflectionPaletteTags[] = {
+    OBJ_EVENT_PAL_TAG_PLAYER_RED_REFLECTION,
+    OBJ_EVENT_PAL_TAG_PLAYER_RED_REFLECTION,
+    OBJ_EVENT_PAL_TAG_PLAYER_RED_REFLECTION,
+    OBJ_EVENT_PAL_TAG_PLAYER_RED_REFLECTION,
 };
 
-const u16 gUnknownPaletteTags_83A5200[] = {
-    OBJ_EVENT_PAL_TAG_22,
-    OBJ_EVENT_PAL_TAG_22,
-    OBJ_EVENT_PAL_TAG_22,
-    OBJ_EVENT_PAL_TAG_22,
+static const u16 sUnusedPlayerReflectionPaletteTags[] = {
+    OBJ_EVENT_PAL_TAG_PLAYER_GREEN_REFLECTION,
+    OBJ_EVENT_PAL_TAG_PLAYER_GREEN_REFLECTION,
+    OBJ_EVENT_PAL_TAG_PLAYER_GREEN_REFLECTION,
+    OBJ_EVENT_PAL_TAG_PLAYER_GREEN_REFLECTION,
 };
 
-const struct PairedPalettes gPlayerReflectionPaletteSets[] = {
-    {OBJ_EVENT_PAL_TAG_8,    gPlayerReflectionPaletteTags},
-    {OBJ_EVENT_PAL_TAG_17,   gPlayerReflectionPaletteTags},
-    {OBJ_EVENT_PAL_TAG_22,   gUnknownPaletteTags_83A5200},
+static const u16 sPlayerUnderwaterReflectionPaletteTags[] = {
+    OBJ_EVENT_PAL_TAG_RS_PLAYER_UNDERWATER,
+    OBJ_EVENT_PAL_TAG_RS_PLAYER_UNDERWATER,
+    OBJ_EVENT_PAL_TAG_RS_PLAYER_UNDERWATER,
+    OBJ_EVENT_PAL_TAG_RS_PLAYER_UNDERWATER,
+};
+
+static const struct PairedPalettes gPlayerReflectionPaletteSets[] = {
+    {OBJ_EVENT_PAL_TAG_PLAYER_RED,           sPlayerReflectionPaletteTags},
+    {OBJ_EVENT_PAL_TAG_PLAYER_GREEN,         sPlayerReflectionPaletteTags},
+    {OBJ_EVENT_PAL_TAG_RS_PLAYER_UNDERWATER, sPlayerUnderwaterReflectionPaletteTags},
     {OBJ_EVENT_PAL_TAG_NONE, NULL},
 };
 
-const u16 gUnknownPaletteTags_83A5228[] = {
-    OBJ_EVENT_PAL_TAG_13,
-    OBJ_EVENT_PAL_TAG_13,
-    OBJ_EVENT_PAL_TAG_13,
-    OBJ_EVENT_PAL_TAG_13,
+static const u16 sRSQuintyPlumpReflectionPaletteTags[] = {
+    OBJ_EVENT_PAL_TAG_RS_QUINTY_PLUMP_REFLECTION,
+    OBJ_EVENT_PAL_TAG_RS_QUINTY_PLUMP_REFLECTION,
+    OBJ_EVENT_PAL_TAG_RS_QUINTY_PLUMP_REFLECTION,
+    OBJ_EVENT_PAL_TAG_RS_QUINTY_PLUMP_REFLECTION,
 };
 
-const u16 gUnknownPaletteTags_83A5230[] = {
-    OBJ_EVENT_PAL_TAG_14,
-    OBJ_EVENT_PAL_TAG_14,
-    OBJ_EVENT_PAL_TAG_14,
-    OBJ_EVENT_PAL_TAG_14,
+static const u16 sRSTruckReflectionPaletteTags[] = {
+    OBJ_EVENT_PAL_TAG_RS_TRUCK,
+    OBJ_EVENT_PAL_TAG_RS_TRUCK,
+    OBJ_EVENT_PAL_TAG_RS_TRUCK,
+    OBJ_EVENT_PAL_TAG_RS_TRUCK,
 };
 
-const u16 gUnknownPaletteTags_83A5238[] = {
-    OBJ_EVENT_PAL_TAG_15,
-    OBJ_EVENT_PAL_TAG_15,
-    OBJ_EVENT_PAL_TAG_15,
-    OBJ_EVENT_PAL_TAG_15,
+static const u16 sRSMachokeReflectionPaletteTags[] = {
+    OBJ_EVENT_PAL_TAG_RS_MACHOKE,
+    OBJ_EVENT_PAL_TAG_RS_MACHOKE,
+    OBJ_EVENT_PAL_TAG_RS_MACHOKE,
+    OBJ_EVENT_PAL_TAG_RS_MACHOKE,
 };
 
-const u16 gUnknownPaletteTags_83A5240[] = {
-    OBJ_EVENT_PAL_TAG_19,
-    OBJ_EVENT_PAL_TAG_19,
-    OBJ_EVENT_PAL_TAG_19,
-    OBJ_EVENT_PAL_TAG_19,
+static const u16 sRSMovingBoxReflectionPaletteTags[] = {
+    OBJ_EVENT_PAL_TAG_RS_MOVING_BOX,
+    OBJ_EVENT_PAL_TAG_RS_MOVING_BOX,
+    OBJ_EVENT_PAL_TAG_RS_MOVING_BOX,
+    OBJ_EVENT_PAL_TAG_RS_MOVING_BOX,
 };
 
-const u16 gUnknownPaletteTags_83A5248[] = {
-    OBJ_EVENT_PAL_TAG_20,
-    OBJ_EVENT_PAL_TAG_20,
-    OBJ_EVENT_PAL_TAG_20,
-    OBJ_EVENT_PAL_TAG_20,
+static const u16 sMeteoriteReflectionPaletteTags[] = {
+    OBJ_EVENT_PAL_TAG_METEORITE,
+    OBJ_EVENT_PAL_TAG_METEORITE,
+    OBJ_EVENT_PAL_TAG_METEORITE,
+    OBJ_EVENT_PAL_TAG_METEORITE,
 };
 
-const u16 gUnknownPaletteTags_83A5250[] = {
-    OBJ_EVENT_PAL_TAG_21,
-    OBJ_EVENT_PAL_TAG_21,
-    OBJ_EVENT_PAL_TAG_21,
-    OBJ_EVENT_PAL_TAG_21,
+static const u16 sSeagallopReflectionPaletteTags[] = {
+    OBJ_EVENT_PAL_TAG_SEAGALLOP,
+    OBJ_EVENT_PAL_TAG_SEAGALLOP,
+    OBJ_EVENT_PAL_TAG_SEAGALLOP,
+    OBJ_EVENT_PAL_TAG_SEAGALLOP,
 };
 
-const u16 gUnknownPaletteTags_83A5258[] = {
-    OBJ_EVENT_PAL_TAG_26,
-    OBJ_EVENT_PAL_TAG_26,
-    OBJ_EVENT_PAL_TAG_26,
-    OBJ_EVENT_PAL_TAG_26,
+static const u16 sRSSubmarineShadowReflectionPaletteTags[] = {
+    OBJ_EVENT_PAL_TAG_RS_SUBMARINE_SHADOW,
+    OBJ_EVENT_PAL_TAG_RS_SUBMARINE_SHADOW,
+    OBJ_EVENT_PAL_TAG_RS_SUBMARINE_SHADOW,
+    OBJ_EVENT_PAL_TAG_RS_SUBMARINE_SHADOW,
 };
 
-const u16 gUnknownPaletteTags_83A5260[] = {
-    OBJ_EVENT_PAL_TAG_24,
-    OBJ_EVENT_PAL_TAG_24,
-    OBJ_EVENT_PAL_TAG_24,
-    OBJ_EVENT_PAL_TAG_24,
+static const u16 sRSKyogreReflectionPaletteTags[] = {
+    OBJ_EVENT_PAL_TAG_RS_KYOGRE_REFLECTION,
+    OBJ_EVENT_PAL_TAG_RS_KYOGRE_REFLECTION,
+    OBJ_EVENT_PAL_TAG_RS_KYOGRE_REFLECTION,
+    OBJ_EVENT_PAL_TAG_RS_KYOGRE_REFLECTION,
 };
 
-const u16 gUnknownPaletteTags_83A5268[] = {
-    0x111a,
-    0x111a,
-    0x111a,
-    0x111a,
+static const u16 sRSGroudonReflectionPaletteTags[] = {
+    OBJ_EVENT_PAL_TAG_RS_GROUDON_REFLECTION,
+    OBJ_EVENT_PAL_TAG_RS_GROUDON_REFLECTION,
+    OBJ_EVENT_PAL_TAG_RS_GROUDON_REFLECTION,
+    OBJ_EVENT_PAL_TAG_RS_GROUDON_REFLECTION,
 };
 
-const u16 gUnknownPaletteTags_83A5270[] = {
-    OBJ_EVENT_PAL_TAG_6,
-    OBJ_EVENT_PAL_TAG_6,
-    OBJ_EVENT_PAL_TAG_6,
-    OBJ_EVENT_PAL_TAG_6,
+static const u16 sGreenNPCReflectionPaletteTags[] = {
+    OBJ_EVENT_PAL_TAG_NPC_GREEN_REFLECTION,
+    OBJ_EVENT_PAL_TAG_NPC_GREEN_REFLECTION,
+    OBJ_EVENT_PAL_TAG_NPC_GREEN_REFLECTION,
+    OBJ_EVENT_PAL_TAG_NPC_GREEN_REFLECTION,
 };
 
-const struct PairedPalettes gSpecialObjectReflectionPaletteSets[] = {
-    {OBJ_EVENT_PAL_TAG_8,    gPlayerReflectionPaletteTags},
-    {OBJ_EVENT_PAL_TAG_17,   gPlayerReflectionPaletteTags},
-    {OBJ_EVENT_PAL_TAG_12,   gUnknownPaletteTags_83A5228},
-    {OBJ_EVENT_PAL_TAG_14,   gUnknownPaletteTags_83A5230},
-    {OBJ_EVENT_PAL_TAG_15,   gUnknownPaletteTags_83A5238},
-    {OBJ_EVENT_PAL_TAG_19,   gUnknownPaletteTags_83A5240},
-    {OBJ_EVENT_PAL_TAG_20,   gUnknownPaletteTags_83A5248},
-    {OBJ_EVENT_PAL_TAG_21,   gUnknownPaletteTags_83A5250},
-    {OBJ_EVENT_PAL_TAG_23,   gUnknownPaletteTags_83A5260},
-    {OBJ_EVENT_PAL_TAG_25,   gUnknownPaletteTags_83A5268},
-    {OBJ_EVENT_PAL_TAG_2,    gUnknownPaletteTags_83A5270},
-    {OBJ_EVENT_PAL_TAG_26,   gUnknownPaletteTags_83A5258},
+static const struct PairedPalettes gSpecialObjectReflectionPaletteSets[] = {
+    {OBJ_EVENT_PAL_TAG_PLAYER_RED,          sPlayerReflectionPaletteTags},
+    {OBJ_EVENT_PAL_TAG_PLAYER_GREEN,        sPlayerReflectionPaletteTags},
+    {OBJ_EVENT_PAL_TAG_RS_QUINTY_PLUMP,     sRSQuintyPlumpReflectionPaletteTags},
+    {OBJ_EVENT_PAL_TAG_RS_TRUCK,            sRSTruckReflectionPaletteTags},
+    {OBJ_EVENT_PAL_TAG_RS_MACHOKE,          sRSMachokeReflectionPaletteTags},
+    {OBJ_EVENT_PAL_TAG_RS_MOVING_BOX,       sRSMovingBoxReflectionPaletteTags},
+    {OBJ_EVENT_PAL_TAG_METEORITE,           sMeteoriteReflectionPaletteTags},
+    {OBJ_EVENT_PAL_TAG_SEAGALLOP,           sSeagallopReflectionPaletteTags},
+    {OBJ_EVENT_PAL_TAG_RS_KYOGRE,           sRSKyogreReflectionPaletteTags},
+    {OBJ_EVENT_PAL_TAG_RS_GROUDON,          sRSGroudonReflectionPaletteTags},
+    {OBJ_EVENT_PAL_TAG_NPC_GREEN,           sGreenNPCReflectionPaletteTags},
+    {OBJ_EVENT_PAL_TAG_RS_SUBMARINE_SHADOW, sRSSubmarineShadowReflectionPaletteTags},
     {OBJ_EVENT_PAL_TAG_NONE, NULL},
 };
 
-const u16 gUnknownPaletteTags_83A52E0[] = {
-    OBJ_EVENT_PAL_TAG_8,
-    OBJ_EVENT_PAL_TAG_9,
-    OBJ_EVENT_PAL_TAG_0,
-    OBJ_EVENT_PAL_TAG_1,
-    OBJ_EVENT_PAL_TAG_2,
-    OBJ_EVENT_PAL_TAG_3,
-    OBJ_EVENT_PAL_TAG_4,
-    OBJ_EVENT_PAL_TAG_5,
-    OBJ_EVENT_PAL_TAG_6,
-    OBJ_EVENT_PAL_TAG_7,
+static const u16 sObjectPaletteTags0[] = {
+    OBJ_EVENT_PAL_TAG_PLAYER_RED,
+    OBJ_EVENT_PAL_TAG_PLAYER_RED_REFLECTION,
+    OBJ_EVENT_PAL_TAG_NPC_BLUE,
+    OBJ_EVENT_PAL_TAG_NPC_PINK,
+    OBJ_EVENT_PAL_TAG_NPC_GREEN,
+    OBJ_EVENT_PAL_TAG_NPC_WHITE,
+    OBJ_EVENT_PAL_TAG_NPC_BLUE_REFLECTION,
+    OBJ_EVENT_PAL_TAG_NPC_PINK_REFLECTION,
+    OBJ_EVENT_PAL_TAG_NPC_GREEN_REFLECTION,
+    OBJ_EVENT_PAL_TAG_NPC_WHITE_REFLECTION,
 };
 
-const u16 gUnknownPaletteTags_83A52F4[] = {
-    OBJ_EVENT_PAL_TAG_8,
-    OBJ_EVENT_PAL_TAG_17,
-    OBJ_EVENT_PAL_TAG_0,
-    OBJ_EVENT_PAL_TAG_1,
-    OBJ_EVENT_PAL_TAG_2,
-    OBJ_EVENT_PAL_TAG_3,
-    OBJ_EVENT_PAL_TAG_4,
-    OBJ_EVENT_PAL_TAG_5,
-    OBJ_EVENT_PAL_TAG_6,
-    OBJ_EVENT_PAL_TAG_7,
+static const u16 sObjectPaletteTags1[] = {
+    OBJ_EVENT_PAL_TAG_PLAYER_RED,
+    OBJ_EVENT_PAL_TAG_PLAYER_GREEN,
+    OBJ_EVENT_PAL_TAG_NPC_BLUE,
+    OBJ_EVENT_PAL_TAG_NPC_PINK,
+    OBJ_EVENT_PAL_TAG_NPC_GREEN,
+    OBJ_EVENT_PAL_TAG_NPC_WHITE,
+    OBJ_EVENT_PAL_TAG_NPC_BLUE_REFLECTION,
+    OBJ_EVENT_PAL_TAG_NPC_PINK_REFLECTION,
+    OBJ_EVENT_PAL_TAG_NPC_GREEN_REFLECTION,
+    OBJ_EVENT_PAL_TAG_NPC_WHITE_REFLECTION,
 };
 
-const u16 gUnknownPaletteTags_83A5308[] = {
-    OBJ_EVENT_PAL_TAG_8,
-    OBJ_EVENT_PAL_TAG_9,
-    OBJ_EVENT_PAL_TAG_0,
-    OBJ_EVENT_PAL_TAG_1,
-    OBJ_EVENT_PAL_TAG_2,
-    OBJ_EVENT_PAL_TAG_3,
-    OBJ_EVENT_PAL_TAG_4,
-    OBJ_EVENT_PAL_TAG_5,
-    OBJ_EVENT_PAL_TAG_6,
-    OBJ_EVENT_PAL_TAG_7,
+static const u16 sObjectPaletteTags2[] = {
+    OBJ_EVENT_PAL_TAG_PLAYER_RED,
+    OBJ_EVENT_PAL_TAG_PLAYER_RED_REFLECTION,
+    OBJ_EVENT_PAL_TAG_NPC_BLUE,
+    OBJ_EVENT_PAL_TAG_NPC_PINK,
+    OBJ_EVENT_PAL_TAG_NPC_GREEN,
+    OBJ_EVENT_PAL_TAG_NPC_WHITE,
+    OBJ_EVENT_PAL_TAG_NPC_BLUE_REFLECTION,
+    OBJ_EVENT_PAL_TAG_NPC_PINK_REFLECTION,
+    OBJ_EVENT_PAL_TAG_NPC_GREEN_REFLECTION,
+    OBJ_EVENT_PAL_TAG_NPC_WHITE_REFLECTION,
 };
 
-const u16 gUnknownPaletteTags_83A531C[] = {
-    OBJ_EVENT_PAL_TAG_8,
-    OBJ_EVENT_PAL_TAG_9,
-    OBJ_EVENT_PAL_TAG_0,
-    OBJ_EVENT_PAL_TAG_1,
-    OBJ_EVENT_PAL_TAG_2,
-    OBJ_EVENT_PAL_TAG_3,
-    OBJ_EVENT_PAL_TAG_4,
-    OBJ_EVENT_PAL_TAG_5,
-    OBJ_EVENT_PAL_TAG_6,
-    OBJ_EVENT_PAL_TAG_7,
+static const u16 sObjectPaletteTags3[] = {
+    OBJ_EVENT_PAL_TAG_PLAYER_RED,
+    OBJ_EVENT_PAL_TAG_PLAYER_RED_REFLECTION,
+    OBJ_EVENT_PAL_TAG_NPC_BLUE,
+    OBJ_EVENT_PAL_TAG_NPC_PINK,
+    OBJ_EVENT_PAL_TAG_NPC_GREEN,
+    OBJ_EVENT_PAL_TAG_NPC_WHITE,
+    OBJ_EVENT_PAL_TAG_NPC_BLUE_REFLECTION,
+    OBJ_EVENT_PAL_TAG_NPC_PINK_REFLECTION,
+    OBJ_EVENT_PAL_TAG_NPC_GREEN_REFLECTION,
+    OBJ_EVENT_PAL_TAG_NPC_WHITE_REFLECTION,
 };
 
-const u16 *const gObjectPaletteTagSets[] = {
-    gUnknownPaletteTags_83A52E0,
-    gUnknownPaletteTags_83A52F4,
-    gUnknownPaletteTags_83A5308,
-    gUnknownPaletteTags_83A531C,
+static const u16 *const gObjectPaletteTagSets[] = {
+    sObjectPaletteTags0,
+    sObjectPaletteTags1,
+    sObjectPaletteTags2,
+    sObjectPaletteTags3,
 };
 
 //#include "data/object_events/berry_tree_graphics_tables.h"
 #include "data/field_effects/field_effect_objects.h"
 
-const s16 gMovementDelaysMedium[] = {32, 64,  96, 128};
-const s16 gMovementDelaysLong[] =   {32, 64, 128, 192};
-const s16 gMovementDelaysShort[] =  {32, 48,  64,  80};
+static const s16 gMovementDelaysMedium[] = {32, 64,  96, 128};
+static const s16 gMovementDelaysLong[] =   {32, 64, 128, 192};
+static const s16 gMovementDelaysShort[] =  {32, 48,  64,  80};
 
 #include "data/object_events/movement_type_func_tables.h"
 
-const u8 gFaceDirectionAnimNums[] = {
+static const u8 gFaceDirectionAnimNums[] = {
     [DIR_NONE]      = 0x00,
     [DIR_SOUTH]     = 0x00,
     [DIR_NORTH]     = 0x01,
@@ -707,7 +701,7 @@ const u8 gFaceDirectionAnimNums[] = {
     [DIR_NORTHEAST] = 0x01,
 };
 
-const u8 gMoveDirectionAnimNums[] = {
+static const u8 gMoveDirectionAnimNums[] = {
     [DIR_NONE]      = 0x4,
     [DIR_SOUTH]     = 0x4,
     [DIR_NORTH]     = 0x5,
@@ -719,7 +713,7 @@ const u8 gMoveDirectionAnimNums[] = {
     [DIR_NORTHEAST] = 0x5,
 };
 
-const u8 gMoveDirectionFastAnimNums[] = {
+static const u8 gMoveDirectionFastAnimNums[] = {
     [DIR_NONE]      = 0x8,
     [DIR_SOUTH]     = 0x8,
     [DIR_NORTH]     = 0x9,
@@ -731,7 +725,7 @@ const u8 gMoveDirectionFastAnimNums[] = {
     [DIR_NORTHEAST] = 0x9,
 };
 
-const u8 gMoveDirectionFasterAnimNums[] = {
+static const u8 gMoveDirectionFasterAnimNums[] = {
     [DIR_NONE]      = 0xC,
     [DIR_SOUTH]     = 0xC,
     [DIR_NORTH]     = 0xD,
@@ -743,7 +737,7 @@ const u8 gMoveDirectionFasterAnimNums[] = {
     [DIR_NORTHEAST] = 0xD,
 };
 
-const u8 gMoveDirectionFastestAnimNums[] = {
+static const u8 gMoveDirectionFastestAnimNums[] = {
     [DIR_NONE]      = 0x10,
     [DIR_SOUTH]     = 0x10,
     [DIR_NORTH]     = 0x11,
@@ -755,7 +749,7 @@ const u8 gMoveDirectionFastestAnimNums[] = {
     [DIR_NORTHEAST] = 0x11,
 };
 
-const u8 gJumpSpecialDirectionAnimNums[] = {
+static const u8 gJumpSpecialDirectionAnimNums[] = {
     [DIR_NONE]      = 0x14,
     [DIR_SOUTH]     = 0x14,
     [DIR_NORTH]     = 0x15,
@@ -767,7 +761,7 @@ const u8 gJumpSpecialDirectionAnimNums[] = {
     [DIR_NORTHEAST] = 0x15,
 };
 
-const u8 gAcroWheelieDirectionAnimNums[] = {
+static const u8 gAcroWheelieDirectionAnimNums[] = {
     [DIR_NONE]      = 0x14,
     [DIR_SOUTH]     = 0x14,
     [DIR_NORTH]     = 0x15,
@@ -779,7 +773,7 @@ const u8 gAcroWheelieDirectionAnimNums[] = {
     [DIR_NORTHEAST] = 0x15,
 };
 
-const u8 gUnrefAnimNums_080634A0[] = {
+static const u8 gUnrefAnimNums_080634A0[] = {
     [DIR_NONE]      = 0x18,
     [DIR_SOUTH]     = 0x18,
     [DIR_NORTH]     = 0x19,
@@ -791,7 +785,7 @@ const u8 gUnrefAnimNums_080634A0[] = {
     [DIR_NORTHEAST] = 0x19,
 };
 
-const u8 gAcroEndWheelieDirectionAnimNums[] = {
+static const u8 gAcroEndWheelieDirectionAnimNums[] = {
     [DIR_NONE]      = 0x1C,
     [DIR_SOUTH]     = 0x1C,
     [DIR_NORTH]     = 0x1D,
@@ -803,7 +797,7 @@ const u8 gAcroEndWheelieDirectionAnimNums[] = {
     [DIR_NORTHEAST] = 0x1D,
 };
 
-const u8 gUnknown_83A6465[] = {
+static const u8 gUnknown_83A6465[] = {
     [DIR_NONE]      = 0x18,
     [DIR_SOUTH]     = 0x18,
     [DIR_NORTH]     = 0x19,
@@ -815,7 +809,7 @@ const u8 gUnknown_83A6465[] = {
     [DIR_NORTHEAST] = 0x1B,
 };
 
-const u8 gAcroUnusedActionDirectionAnimNums[] = {
+static const u8 gAcroUnusedActionDirectionAnimNums[] = {
     [DIR_NONE]      = 0x20,
     [DIR_SOUTH]     = 0x20,
     [DIR_NORTH]     = 0x21,
@@ -827,7 +821,7 @@ const u8 gAcroUnusedActionDirectionAnimNums[] = {
     [DIR_NORTHEAST] = 0x21,
 };
 
-const u8 gAcroWheeliePedalDirectionAnimNums[] = {
+static const u8 gAcroWheeliePedalDirectionAnimNums[] = {
     [DIR_NONE]      = 0x24,
     [DIR_SOUTH]     = 0x24,
     [DIR_NORTH]     = 0x25,
@@ -839,7 +833,7 @@ const u8 gAcroWheeliePedalDirectionAnimNums[] = {
     [DIR_NORTHEAST] = 0x25,
 };
 
-const u8 gFishingDirectionAnimNums[] = {
+static const u8 gFishingDirectionAnimNums[] = {
     [DIR_NONE]      = 0x0,
     [DIR_SOUTH]     = 0x0,
     [DIR_NORTH]     = 0x1,
@@ -851,7 +845,7 @@ const u8 gFishingDirectionAnimNums[] = {
     [DIR_NORTHEAST] = 0x1,
 };
 
-const u8 gFishingNoCatchDirectionAnimNums[] = {
+static const u8 gFishingNoCatchDirectionAnimNums[] = {
     [DIR_NONE]      = 0x4,
     [DIR_SOUTH]     = 0x4,
     [DIR_NORTH]     = 0x5,
@@ -863,7 +857,7 @@ const u8 gFishingNoCatchDirectionAnimNums[] = {
     [DIR_NORTHEAST] = 0x5,
 };
 
-const u8 gFishingBiteDirectionAnimNums[] = {
+static const u8 gFishingBiteDirectionAnimNums[] = {
     [DIR_NONE]      = 0x8,
     [DIR_SOUTH]     = 0x8,
     [DIR_NORTH]     = 0x9,
@@ -875,7 +869,7 @@ const u8 gFishingBiteDirectionAnimNums[] = {
     [DIR_NORTHEAST] = 0x9,
 };
 
-const u8 gRunningDirectionAnimNums[] = {
+static const u8 gRunningDirectionAnimNums[] = {
     [DIR_NONE]      = 0x14,
     [DIR_SOUTH]     = 0x14,
     [DIR_NORTH]     = 0x15,
@@ -887,7 +881,7 @@ const u8 gRunningDirectionAnimNums[] = {
     [DIR_NORTHEAST] = 0x15,
 };
 
-const u8 gTrainerFacingDirectionMovementTypes[] = {
+static const u8 gTrainerFacingDirectionMovementTypes[] = {
     [DIR_NONE]      = 0x08,
     [DIR_SOUTH]     = 0x08,
     [DIR_NORTH]     = 0x07,
@@ -925,7 +919,7 @@ static const struct Coords16 sDirectionToVectors[] = {
     [DIR_NORTHEAST] = { 1, -1},
 };
 
-const u8 gFaceDirectionMovementActions[] = {
+static const u8 gFaceDirectionMovementActions[] = {
     [DIR_NONE]  = MOVEMENT_ACTION_FACE_DOWN,
     [DIR_SOUTH] = MOVEMENT_ACTION_FACE_DOWN,
     [DIR_NORTH] = MOVEMENT_ACTION_FACE_UP,
@@ -933,7 +927,7 @@ const u8 gFaceDirectionMovementActions[] = {
     [DIR_EAST]  = MOVEMENT_ACTION_FACE_RIGHT,
 };
 
-const u8 gFaceDirectionFastMovementActions[] = {
+static const u8 gFaceDirectionFastMovementActions[] = {
     [DIR_NONE]  = MOVEMENT_ACTION_FACE_DOWN_FAST,
     [DIR_SOUTH] = MOVEMENT_ACTION_FACE_DOWN_FAST,
     [DIR_NORTH] = MOVEMENT_ACTION_FACE_UP_FAST,
@@ -941,7 +935,7 @@ const u8 gFaceDirectionFastMovementActions[] = {
     [DIR_EAST]  = MOVEMENT_ACTION_FACE_RIGHT_FAST,
 };
 
-const u8 gUnknown_83A64F6[] = {
+static const u8 gUnknown_83A64F6[] = {
     [DIR_NONE]  = MOVEMENT_ACTION_0x9B,
     [DIR_SOUTH] = MOVEMENT_ACTION_0x9B,
     [DIR_NORTH] = MOVEMENT_ACTION_0x9C,
@@ -949,7 +943,7 @@ const u8 gUnknown_83A64F6[] = {
     [DIR_EAST]  = MOVEMENT_ACTION_0x9E,
 };
 
-const u8 gUnknown_83A64FB[] = {
+static const u8 gUnknown_83A64FB[] = {
     [DIR_NONE]  = MOVEMENT_ACTION_WALK_SLOWEST_DOWN,
     [DIR_SOUTH] = MOVEMENT_ACTION_WALK_SLOWEST_DOWN,
     [DIR_NORTH] = MOVEMENT_ACTION_WALK_SLOWEST_UP,
@@ -957,7 +951,7 @@ const u8 gUnknown_83A64FB[] = {
     [DIR_EAST]  = MOVEMENT_ACTION_WALK_SLOWEST_RIGHT,
 };
 
-const u8 gUnknown_83A6500[] = {
+static const u8 gUnknown_83A6500[] = {
     [DIR_NONE]  = MOVEMENT_ACTION_WALK_SLOW_DOWN,
     [DIR_SOUTH] = MOVEMENT_ACTION_WALK_SLOW_DOWN,
     [DIR_NORTH] = MOVEMENT_ACTION_WALK_SLOW_UP,
@@ -965,7 +959,7 @@ const u8 gUnknown_83A6500[] = {
     [DIR_EAST]  = MOVEMENT_ACTION_WALK_SLOW_RIGHT,
 };
 
-const u8 gUnknown_83A6505[] = {
+static const u8 gUnknown_83A6505[] = {
     [DIR_NONE]  = MOVEMENT_ACTION_WALK_NORMAL_DOWN,
     [DIR_SOUTH] = MOVEMENT_ACTION_WALK_NORMAL_DOWN,
     [DIR_NORTH] = MOVEMENT_ACTION_WALK_NORMAL_UP,
@@ -973,7 +967,7 @@ const u8 gUnknown_83A6505[] = {
     [DIR_EAST]  = MOVEMENT_ACTION_WALK_NORMAL_RIGHT,
 };
 
-const u8 gUnknown_83A650A[] = {
+static const u8 gUnknown_83A650A[] = {
     [DIR_NONE]  = MOVEMENT_ACTION_WALK_FAST_DOWN,
     [DIR_SOUTH] = MOVEMENT_ACTION_WALK_FAST_DOWN,
     [DIR_NORTH] = MOVEMENT_ACTION_WALK_FAST_UP,
@@ -981,7 +975,7 @@ const u8 gUnknown_83A650A[] = {
     [DIR_EAST]  = MOVEMENT_ACTION_WALK_FAST_RIGHT,
 };
 
-const u8 gUnknown_83A650F[] = {
+static const u8 gUnknown_83A650F[] = {
     [DIR_NONE]  = MOVEMENT_ACTION_0xA0,
     [DIR_SOUTH] = MOVEMENT_ACTION_0xA0,
     [DIR_NORTH] = MOVEMENT_ACTION_0xA1,
@@ -989,7 +983,7 @@ const u8 gUnknown_83A650F[] = {
     [DIR_EAST]  = MOVEMENT_ACTION_0xA3,
 };
 
-const u8 gUnknown_83A6514[] = {
+static const u8 gUnknown_83A6514[] = {
     [DIR_NONE]  = MOVEMENT_ACTION_FACE_DOWN_SLOW,
     [DIR_SOUTH] = MOVEMENT_ACTION_FACE_DOWN_SLOW,
     [DIR_NORTH] = MOVEMENT_ACTION_FACE_UP_SLOW,
@@ -997,7 +991,7 @@ const u8 gUnknown_83A6514[] = {
     [DIR_EAST]  = MOVEMENT_ACTION_FACE_RIGHT_SLOW,
 };
 
-const u8 gUnknown_83A6519[] = {
+static const u8 gUnknown_83A6519[] = {
     [DIR_NONE]  = MOVEMENT_ACTION_WALK_FASTEST_DOWN,
     [DIR_SOUTH] = MOVEMENT_ACTION_WALK_FASTEST_DOWN,
     [DIR_NORTH] = MOVEMENT_ACTION_WALK_FASTEST_UP,
@@ -1005,7 +999,7 @@ const u8 gUnknown_83A6519[] = {
     [DIR_EAST]  = MOVEMENT_ACTION_WALK_FASTEST_RIGHT,
 };
 
-const u8 gUnknown_83A651E[] = {
+static const u8 gUnknown_83A651E[] = {
     [DIR_NONE]  = MOVEMENT_ACTION_SLIDE_DOWN,
     [DIR_SOUTH] = MOVEMENT_ACTION_SLIDE_DOWN,
     [DIR_NORTH] = MOVEMENT_ACTION_SLIDE_UP,
@@ -1013,7 +1007,7 @@ const u8 gUnknown_83A651E[] = {
     [DIR_EAST]  = MOVEMENT_ACTION_SLIDE_RIGHT,
 };
 
-const u8 gUnknown_83A6523[] = {
+static const u8 gUnknown_83A6523[] = {
     [DIR_NONE]  = MOVEMENT_ACTION_PLAYER_RUN_DOWN,
     [DIR_SOUTH] = MOVEMENT_ACTION_PLAYER_RUN_DOWN,
     [DIR_NORTH] = MOVEMENT_ACTION_PLAYER_RUN_UP,
@@ -1021,7 +1015,7 @@ const u8 gUnknown_83A6523[] = {
     [DIR_EAST]  = MOVEMENT_ACTION_PLAYER_RUN_RIGHT,
 };
 
-const u8 gUnknown_83A6528[] = {
+static const u8 gUnknown_83A6528[] = {
     [DIR_NONE]  = MOVEMENT_ACTION_PLAYER_RUN_DOWN_SLOW,
     [DIR_SOUTH] = MOVEMENT_ACTION_PLAYER_RUN_DOWN_SLOW,
     [DIR_NORTH] = MOVEMENT_ACTION_PLAYER_RUN_UP_SLOW,
@@ -1029,7 +1023,7 @@ const u8 gUnknown_83A6528[] = {
     [DIR_EAST]  = MOVEMENT_ACTION_PLAYER_RUN_RIGHT_SLOW,
 };
 
-const u8 gUnknown_83A652D[] = {
+static const u8 gUnknown_83A652D[] = {
     [DIR_NONE]  = MOVEMENT_ACTION_ACRO_END_WHEELIE_MOVE_DOWN,
     [DIR_SOUTH] = MOVEMENT_ACTION_ACRO_END_WHEELIE_MOVE_DOWN,
     [DIR_NORTH] = MOVEMENT_ACTION_ACRO_END_WHEELIE_MOVE_UP,
@@ -1037,7 +1031,7 @@ const u8 gUnknown_83A652D[] = {
     [DIR_EAST]  = MOVEMENT_ACTION_ACRO_END_WHEELIE_MOVE_RIGHT,
 };
 
-const u8 gUnknown_83A6532[] = {
+static const u8 gUnknown_83A6532[] = {
     [DIR_NONE]  = MOVEMENT_ACTION_JUMP_2_DOWN,
     [DIR_SOUTH] = MOVEMENT_ACTION_JUMP_2_DOWN,
     [DIR_NORTH] = MOVEMENT_ACTION_JUMP_2_UP,
@@ -1045,7 +1039,7 @@ const u8 gUnknown_83A6532[] = {
     [DIR_EAST]  = MOVEMENT_ACTION_JUMP_2_RIGHT,
 };
 
-const u8 gUnknown_83A6537[] = {
+static const u8 gUnknown_83A6537[] = {
     [DIR_NONE]  = MOVEMENT_ACTION_JUMP_IN_PLACE_DOWN,
     [DIR_SOUTH] = MOVEMENT_ACTION_JUMP_IN_PLACE_DOWN,
     [DIR_NORTH] = MOVEMENT_ACTION_JUMP_IN_PLACE_UP,
@@ -1053,7 +1047,7 @@ const u8 gUnknown_83A6537[] = {
     [DIR_EAST]  = MOVEMENT_ACTION_JUMP_IN_PLACE_RIGHT,
 };
 
-const u8 gUnknown_83A653C[] = {
+static const u8 gUnknown_83A653C[] = {
     [DIR_NONE]  = MOVEMENT_ACTION_JUMP_IN_PLACE_UP_DOWN,
     [DIR_SOUTH] = MOVEMENT_ACTION_JUMP_IN_PLACE_UP_DOWN,
     [DIR_NORTH] = MOVEMENT_ACTION_JUMP_IN_PLACE_DOWN_UP,
@@ -1061,7 +1055,7 @@ const u8 gUnknown_83A653C[] = {
     [DIR_EAST]  = MOVEMENT_ACTION_JUMP_IN_PLACE_LEFT_RIGHT,
 };
 
-const u8 gUnknown_83A6541[] = {
+static const u8 gUnknown_83A6541[] = {
     [DIR_NONE]  = MOVEMENT_ACTION_JUMP_DOWN,
     [DIR_SOUTH] = MOVEMENT_ACTION_JUMP_DOWN,
     [DIR_NORTH] = MOVEMENT_ACTION_JUMP_UP,
@@ -1069,7 +1063,7 @@ const u8 gUnknown_83A6541[] = {
     [DIR_EAST]  = MOVEMENT_ACTION_JUMP_RIGHT,
 };
 
-const u8 gUnknown_83A6546[] = {
+static const u8 gUnknown_83A6546[] = {
     [DIR_NONE]  = MOVEMENT_ACTION_JUMP_SPECIAL_DOWN,
     [DIR_SOUTH] = MOVEMENT_ACTION_JUMP_SPECIAL_DOWN,
     [DIR_NORTH] = MOVEMENT_ACTION_JUMP_SPECIAL_UP,
@@ -1077,7 +1071,7 @@ const u8 gUnknown_83A6546[] = {
     [DIR_EAST]  = MOVEMENT_ACTION_JUMP_SPECIAL_RIGHT,
 };
 
-const u8 gUnknown_83A654B[] = {
+static const u8 gUnknown_83A654B[] = {
     [DIR_NONE]  = MOVEMENT_ACTION_0xA6,
     [DIR_SOUTH] = MOVEMENT_ACTION_0xA6,
     [DIR_NORTH] = MOVEMENT_ACTION_0xA7,
@@ -1085,7 +1079,7 @@ const u8 gUnknown_83A654B[] = {
     [DIR_EAST]  = MOVEMENT_ACTION_0xA9,
 };
 
-const u8 gUnknown_83A6550[] = {
+static const u8 gUnknown_83A6550[] = {
     [DIR_NONE]  = MOVEMENT_ACTION_WALK_IN_PLACE_SLOW_DOWN,
     [DIR_SOUTH] = MOVEMENT_ACTION_WALK_IN_PLACE_SLOW_DOWN,
     [DIR_NORTH] = MOVEMENT_ACTION_WALK_IN_PLACE_SLOW_UP,
@@ -1093,7 +1087,7 @@ const u8 gUnknown_83A6550[] = {
     [DIR_EAST]  = MOVEMENT_ACTION_WALK_IN_PLACE_SLOW_RIGHT,
 };
 
-const u8 gUnknown_83A6555[] = {
+static const u8 gUnknown_83A6555[] = {
     [DIR_NONE]  = MOVEMENT_ACTION_WALK_IN_PLACE_NORMAL_DOWN,
     [DIR_SOUTH] = MOVEMENT_ACTION_WALK_IN_PLACE_NORMAL_DOWN,
     [DIR_NORTH] = MOVEMENT_ACTION_WALK_IN_PLACE_NORMAL_UP,
@@ -1101,7 +1095,7 @@ const u8 gUnknown_83A6555[] = {
     [DIR_EAST]  = MOVEMENT_ACTION_WALK_IN_PLACE_NORMAL_RIGHT,
 };
 
-const u8 gUnknown_83A655A[] = {
+static const u8 gUnknown_83A655A[] = {
     [DIR_NONE]  = MOVEMENT_ACTION_WALK_IN_PLACE_FAST_DOWN,
     [DIR_SOUTH] = MOVEMENT_ACTION_WALK_IN_PLACE_FAST_DOWN,
     [DIR_NORTH] = MOVEMENT_ACTION_WALK_IN_PLACE_FAST_UP,
@@ -1109,7 +1103,7 @@ const u8 gUnknown_83A655A[] = {
     [DIR_EAST]  = MOVEMENT_ACTION_WALK_IN_PLACE_FAST_RIGHT,
 };
 
-const u8 gUnknown_83A655F[] = {
+static const u8 gUnknown_83A655F[] = {
     [DIR_NONE]  = MOVEMENT_ACTION_WALK_IN_PLACE_FASTEST_DOWN,
     [DIR_SOUTH] = MOVEMENT_ACTION_WALK_IN_PLACE_FASTEST_DOWN,
     [DIR_NORTH] = MOVEMENT_ACTION_WALK_IN_PLACE_FASTEST_UP,
@@ -1117,7 +1111,7 @@ const u8 gUnknown_83A655F[] = {
     [DIR_EAST]  = MOVEMENT_ACTION_WALK_IN_PLACE_FASTEST_RIGHT,
 };
 
-const u8 gUnknown_83A6564[] = {
+static const u8 gUnknown_83A6564[] = {
     [DIR_NONE]  = MOVEMENT_ACTION_ACRO_WHEELIE_FACE_DOWN,
     [DIR_SOUTH] = MOVEMENT_ACTION_ACRO_WHEELIE_FACE_DOWN,
     [DIR_NORTH] = MOVEMENT_ACTION_ACRO_WHEELIE_FACE_UP,
@@ -1125,7 +1119,7 @@ const u8 gUnknown_83A6564[] = {
     [DIR_EAST]  = MOVEMENT_ACTION_ACRO_WHEELIE_FACE_RIGHT,
 };
 
-const u8 gUnknown_83A6569[] = {
+static const u8 gUnknown_83A6569[] = {
     [DIR_NONE]  = MOVEMENT_ACTION_ACRO_POP_WHEELIE_DOWN,
     [DIR_SOUTH] = MOVEMENT_ACTION_ACRO_POP_WHEELIE_DOWN,
     [DIR_NORTH] = MOVEMENT_ACTION_ACRO_POP_WHEELIE_UP,
@@ -1133,7 +1127,7 @@ const u8 gUnknown_83A6569[] = {
     [DIR_EAST]  = MOVEMENT_ACTION_ACRO_POP_WHEELIE_RIGHT,
 };
 
-const u8 gUnknown_83A656E[] = {
+static const u8 gUnknown_83A656E[] = {
     [DIR_NONE]  = MOVEMENT_ACTION_ACRO_END_WHEELIE_FACE_DOWN,
     [DIR_SOUTH] = MOVEMENT_ACTION_ACRO_END_WHEELIE_FACE_DOWN,
     [DIR_NORTH] = MOVEMENT_ACTION_ACRO_END_WHEELIE_FACE_UP,
@@ -1141,7 +1135,7 @@ const u8 gUnknown_83A656E[] = {
     [DIR_EAST]  = MOVEMENT_ACTION_ACRO_END_WHEELIE_FACE_RIGHT,
 };
 
-const u8 gUnknown_83A6573[] = {
+static const u8 gUnknown_83A6573[] = {
     [DIR_NONE]  = MOVEMENT_ACTION_ACRO_WHEELIE_HOP_FACE_DOWN,
     [DIR_SOUTH] = MOVEMENT_ACTION_ACRO_WHEELIE_HOP_FACE_DOWN,
     [DIR_NORTH] = MOVEMENT_ACTION_ACRO_WHEELIE_HOP_FACE_UP,
@@ -1149,7 +1143,7 @@ const u8 gUnknown_83A6573[] = {
     [DIR_EAST]  = MOVEMENT_ACTION_ACRO_WHEELIE_HOP_FACE_RIGHT,
 };
 
-const u8 gUnknown_83A6578[] = {
+static const u8 gUnknown_83A6578[] = {
     [DIR_NONE]  = MOVEMENT_ACTION_ACRO_WHEELIE_HOP_DOWN,
     [DIR_SOUTH] = MOVEMENT_ACTION_ACRO_WHEELIE_HOP_DOWN,
     [DIR_NORTH] = MOVEMENT_ACTION_ACRO_WHEELIE_HOP_UP,
@@ -1157,7 +1151,7 @@ const u8 gUnknown_83A6578[] = {
     [DIR_EAST]  = MOVEMENT_ACTION_ACRO_WHEELIE_HOP_RIGHT,
 };
 
-const u8 gUnknown_83A657D[] = {
+static const u8 gUnknown_83A657D[] = {
     [DIR_NONE]  = MOVEMENT_ACTION_ACRO_WHEELIE_JUMP_DOWN,
     [DIR_SOUTH] = MOVEMENT_ACTION_ACRO_WHEELIE_JUMP_DOWN,
     [DIR_NORTH] = MOVEMENT_ACTION_ACRO_WHEELIE_JUMP_UP,
@@ -1165,7 +1159,7 @@ const u8 gUnknown_83A657D[] = {
     [DIR_EAST]  = MOVEMENT_ACTION_ACRO_WHEELIE_JUMP_RIGHT,
 };
 
-const u8 gUnknown_83A6582[] = {
+static const u8 gUnknown_83A6582[] = {
     [DIR_NONE]  = MOVEMENT_ACTION_ACRO_WHEELIE_IN_PLACE_DOWN,
     [DIR_SOUTH] = MOVEMENT_ACTION_ACRO_WHEELIE_IN_PLACE_DOWN,
     [DIR_NORTH] = MOVEMENT_ACTION_ACRO_WHEELIE_IN_PLACE_UP,
@@ -1173,7 +1167,7 @@ const u8 gUnknown_83A6582[] = {
     [DIR_EAST]  = MOVEMENT_ACTION_ACRO_WHEELIE_IN_PLACE_RIGHT,
 };
 
-const u8 gUnknown_83A6587[] = {
+static const u8 gUnknown_83A6587[] = {
     [DIR_NONE]  = MOVEMENT_ACTION_ACRO_POP_WHEELIE_MOVE_DOWN,
     [DIR_SOUTH] = MOVEMENT_ACTION_ACRO_POP_WHEELIE_MOVE_DOWN,
     [DIR_NORTH] = MOVEMENT_ACTION_ACRO_POP_WHEELIE_MOVE_UP,
@@ -1181,7 +1175,7 @@ const u8 gUnknown_83A6587[] = {
     [DIR_EAST]  = MOVEMENT_ACTION_ACRO_POP_WHEELIE_MOVE_RIGHT,
 };
 
-const u8 gUnknown_83A658C[] = {
+static const u8 gUnknown_83A658C[] = {
     [DIR_NONE]  = MOVEMENT_ACTION_ACRO_WHEELIE_MOVE_DOWN,
     [DIR_SOUTH] = MOVEMENT_ACTION_ACRO_WHEELIE_MOVE_DOWN,
     [DIR_NORTH] = MOVEMENT_ACTION_ACRO_WHEELIE_MOVE_UP,
@@ -1189,7 +1183,7 @@ const u8 gUnknown_83A658C[] = {
     [DIR_EAST]  = MOVEMENT_ACTION_ACRO_WHEELIE_MOVE_RIGHT,
 };
 
-const u8 gOppositeDirections[] = {
+static const u8 gOppositeDirections[] = {
     DIR_NORTH,
     DIR_SOUTH,
     DIR_EAST,
@@ -1200,14 +1194,14 @@ const u8 gOppositeDirections[] = {
     DIR_SOUTHWEST,
 };
 
-const u8 gUnknown_83A6599[][4] = {
+static const u8 gUnknown_83A6599[][4] = {
     {2, 1, 4, 3},
     {1, 2, 3, 4},
     {3, 4, 2, 1},
     {4, 3, 1, 2}
 };
 
-const u8 gUnknown_83A65A9[][4] = {
+static const u8 gUnknown_83A65A9[][4] = {
     {2, 1, 4, 3},
     {1, 2, 3, 4},
     {4, 3, 1, 2},
@@ -1243,13 +1237,13 @@ void ResetObjectEvents(void)
 
 static void CreateReflectionEffectSprites(void)
 {
-    u8 spriteId = CreateSpriteAtEnd(gFieldEffectObjectTemplatePointers[21], 0, 0, 31);
+    u8 spriteId = CreateSpriteAtEnd(gFieldEffectObjectTemplatePointers[FLDEFFOBJ_REFLECTION_DISTORTION], 0, 0, 31);
     gSprites[spriteId].oam.affineMode = ST_OAM_AFFINE_NORMAL;
     InitSpriteAffineAnim(&gSprites[spriteId]);
     StartSpriteAffineAnim(&gSprites[spriteId], 0);
     gSprites[spriteId].invisible = TRUE;
 
-    spriteId = CreateSpriteAtEnd(gFieldEffectObjectTemplatePointers[21], 0, 0, 31);
+    spriteId = CreateSpriteAtEnd(gFieldEffectObjectTemplatePointers[FLDEFFOBJ_REFLECTION_DISTORTION], 0, 0, 31);
     gSprites[spriteId].oam.affineMode = ST_OAM_AFFINE_NORMAL;
     InitSpriteAffineAnim(&gSprites[spriteId]);
     StartSpriteAffineAnim(&gSprites[spriteId], 1);
@@ -1322,45 +1316,54 @@ static u8 GetObjectEventIdByLocalId(u8 localId)
     return OBJECT_EVENTS_COUNT;
 }
 
-#ifdef NONMATCHING
 static u8 InitObjectEventStateFromTemplate(struct ObjectEventTemplate *template, u8 mapNum, u8 mapGroup)
 {
     struct ObjectEvent *objectEvent;
-    struct ObjectEventTemplate *template2 = template;
+    const struct MapHeader *mapHeader;
     u8 objectEventId;
+    u8 var0;
+    u8 elevation;
     s16 x;
     s16 y;
-    s16 var;
     s16 x2;
     s16 y2;
-    s16 elevation2;
+    s16 x3;
+    s16 y3;
     
-    if(template->inConnection == 0xFF)
+    var0 = 0;
+    elevation = 0;
+    x2 = 0;
+    y2 = 0;
+    x3 = 0;
+    y3 = 0;
+    
+    if (template->inConnection == 0xFF)
     {
-        var = 1;
-        mapNum = template2->trainerType;
-        mapGroup = template2->trainerRange_berryTreeId & 0xFF;
-        elevation2 = template2->elevation;
-        x = template2->x;
-        y = template2->y;
-        x2 = template2->x;
-        y2 = template2->y;
-        template = &Overworld_GetMapHeaderByGroupAndId(mapGroup, mapNum)->events->objectEvents[elevation2 - 1];
+        var0 = 1;
+        elevation = template->elevation;
+        mapNum = template->trainerType;
+        mapGroup = template->trainerRange_berryTreeId & 0xFF;
+        x2 = template->x;
+        y2 = template->y;
+        x3 = template->x;
+        y3 = template->y;
+        mapHeader = Overworld_GetMapHeaderByGroupAndId(mapGroup, mapNum);
+        template = &(mapHeader->events->objectEvents[elevation - 1]);
     }
     if (GetAvailableObjectEventId(template->localId, mapNum, mapGroup, &objectEventId)
-        && !sub_805E238(template, var, x2, y2))
+        || !sub_805E238(template, var0, x3, y3))
         return OBJECT_EVENTS_COUNT;
     objectEvent = &gObjectEvents[objectEventId];
     ClearObjectEvent(objectEvent);
-    if (var)
-    {
-        x = x2 * 0x10000 + 0x7000;
-        y = y2 * 0x10000 + 0x7000;
-    }
-    else
+    if (var0)
     {
         x = x2 + 7;
         y = y2 + 7;
+    }
+    else
+    {
+        x = template->x + 7;
+        y = template->y + 7;
     }
     objectEvent->active = TRUE;
     objectEvent->triggerGroundEffectsOnMove = TRUE;
@@ -1368,7 +1371,6 @@ static u8 InitObjectEventStateFromTemplate(struct ObjectEventTemplate *template,
     objectEvent->movementType = template->movementType;
     objectEvent->localId = template->localId;
     objectEvent->mapNum = mapNum;
-    // objectEvent++; objectEvent--; is a trick used in pokeruby and pokeemerald here
     objectEvent->mapGroup = mapGroup;
     objectEvent->initialCoords.x = x;
     objectEvent->initialCoords.y = y;
@@ -1378,258 +1380,27 @@ static u8 InitObjectEventStateFromTemplate(struct ObjectEventTemplate *template,
     objectEvent->previousCoords.y = y;
     objectEvent->currentElevation = template->elevation;
     objectEvent->previousElevation = template->elevation;
-    objectEvent->range.as_nybbles.x = template->movementRangeX;
-    objectEvent->range.as_nybbles.y = template->movementRangeY;
+    objectEvent->rangeX = template->movementRangeX;
+    objectEvent->rangeY = template->movementRangeY;
     objectEvent->trainerType = template->trainerType;
     objectEvent->trainerRange_berryTreeId = template->trainerRange_berryTreeId;
+    objectEvent->mapNum = mapNum; // oops (yes this is required for matching)
     objectEvent->previousMovementDirection = gInitialMovementTypeFacingDirections[template->movementType];
     SetObjectEventDirection(objectEvent, objectEvent->previousMovementDirection);
     SetObjectEventDynamicGraphicsId(objectEvent);
-/*#ifndef NONMATCHING
-    asm("":::"r5", "r6"); is a trick used in pokeruby and pokeemerald here
-#endif*/
     if (gRangedMovementTypes[objectEvent->movementType])
     {
-        if (objectEvent->range.as_nybbles.x == 0)
+        if (objectEvent->rangeX == 0)
         {
-            objectEvent->range.as_nybbles.x++;
+            objectEvent->rangeX++;
         }
-        if (objectEvent->range.as_nybbles.y == 0)
+        if (objectEvent->rangeY == 0)
         {
-            objectEvent->range.as_nybbles.y++;
+            objectEvent->rangeY++;
         }
     }
     return objectEventId;
 }
-#else
-NAKED
-static u8 InitObjectEventStateFromTemplate(struct ObjectEventTemplate *template, u8 mapNum, u8 mapGroup)
-{
-    asm_unified("\n\
-        push {r4-r7,lr}\n\
-        mov r7, r10\n\
-        mov r6, r9\n\
-        mov r5, r8\n\
-        push {r5-r7}\n\
-        sub sp, 0xC\n\
-        adds r5, r0, 0\n\
-        lsls r1, 24\n\
-        lsrs r7, r1, 24\n\
-        lsls r2, 24\n\
-        lsrs r6, r2, 24\n\
-        movs r0, 0\n\
-        mov r10, r0\n\
-        mov r8, r0\n\
-        mov r9, r0\n\
-        movs r1, 0\n\
-        str r1, [sp, 0x4]\n\
-        str r0, [sp, 0x8]\n\
-        ldrb r0, [r5, 0x2]\n\
-        cmp r0, 0xFF\n\
-        bne _0805E0DA\n\
-        movs r1, 0x1\n\
-        mov r10, r1\n\
-        ldrb r4, [r5, 0x8]\n\
-        ldrb r7, [r5, 0xC]\n\
-        ldrb r6, [r5, 0xE]\n\
-        ldrh r0, [r5, 0x4]\n\
-        mov r8, r0\n\
-        ldrh r5, [r5, 0x6]\n\
-        mov r9, r5\n\
-        mov r1, r8\n\
-        str r1, [sp, 0x4]\n\
-        mov r0, r9\n\
-        str r0, [sp, 0x8]\n\
-        adds r0, r6, 0\n\
-        adds r1, r7, 0\n\
-        bl Overworld_GetMapHeaderByGroupAndId\n\
-        ldr r1, [r0, 0x4]\n\
-        lsls r0, r4, 1\n\
-        adds r0, r4\n\
-        lsls r0, 3\n\
-        subs r0, 0x18\n\
-        ldr r1, [r1, 0x4]\n\
-        adds r5, r1, r0\n\
-    _0805E0DA:\n\
-        ldrb r0, [r5]\n\
-        adds r1, r7, 0\n\
-        adds r2, r6, 0\n\
-        mov r3, sp\n\
-        bl GetAvailableObjectEventId\n\
-        lsls r0, 24\n\
-        cmp r0, 0\n\
-        bne _0805E106\n\
-        ldr r1, [sp, 0x4]\n\
-        lsls r2, r1, 16\n\
-        asrs r2, 16\n\
-        ldr r0, [sp, 0x8]\n\
-        lsls r3, r0, 16\n\
-        asrs r3, 16\n\
-        adds r0, r5, 0\n\
-        mov r1, r10\n\
-        bl sub_805E238\n\
-        lsls r0, 24\n\
-        cmp r0, 0\n\
-        bne _0805E10A\n\
-    _0805E106:\n\
-        movs r0, 0x10\n\
-        b _0805E220\n\
-    _0805E10A:\n\
-        mov r0, sp\n\
-        ldrb r1, [r0]\n\
-        lsls r0, r1, 3\n\
-        adds r0, r1\n\
-        lsls r0, 2\n\
-        ldr r1, _0805E13C @ =gObjectEvents\n\
-        adds r4, r0, r1\n\
-        adds r0, r4, 0\n\
-        bl ClearObjectEvent\n\
-        mov r1, r10\n\
-        cmp r1, 0\n\
-        beq _0805E140\n\
-        mov r1, r8\n\
-        lsls r0, r1, 16\n\
-        movs r1, 0xE0\n\
-        lsls r1, 11\n\
-        adds r0, r1\n\
-        lsrs r3, r0, 16\n\
-        mov r1, r9\n\
-        lsls r0, r1, 16\n\
-        movs r1, 0xE0\n\
-        lsls r1, 11\n\
-        adds r0, r1\n\
-        b _0805E14E\n\
-        .align 2, 0\n\
-    _0805E13C: .4byte gObjectEvents\n\
-    _0805E140:\n\
-        ldrh r0, [r5, 0x4]\n\
-        adds r0, 0x7\n\
-        lsls r0, 16\n\
-        lsrs r3, r0, 16\n\
-        ldrh r0, [r5, 0x6]\n\
-        adds r0, 0x7\n\
-        lsls r0, 16\n\
-    _0805E14E:\n\
-        lsrs r2, r0, 16\n\
-        ldrb r0, [r4]\n\
-        movs r1, 0x1\n\
-        orrs r0, r1\n\
-        movs r1, 0x4\n\
-        orrs r0, r1\n\
-        strb r0, [r4]\n\
-        ldrb r0, [r5, 0x1]\n\
-        strb r0, [r4, 0x5]\n\
-        ldrb r0, [r5, 0x9]\n\
-        strb r0, [r4, 0x6]\n\
-        ldrb r0, [r5]\n\
-        strb r0, [r4, 0x8]\n\
-        strb r7, [r4, 0x9]\n\
-        strb r6, [r4, 0xA]\n\
-        strh r3, [r4, 0xC]\n\
-        strh r2, [r4, 0xE]\n\
-        strh r3, [r4, 0x10]\n\
-        strh r2, [r4, 0x12]\n\
-        strh r3, [r4, 0x14]\n\
-        strh r2, [r4, 0x16]\n\
-        ldrb r0, [r5, 0x8]\n\
-        movs r6, 0xF\n\
-        adds r1, r6, 0\n\
-        ands r1, r0\n\
-        ldrb r2, [r4, 0xB]\n\
-        movs r0, 0x10\n\
-        negs r0, r0\n\
-        mov r8, r0\n\
-        ands r0, r2\n\
-        orrs r0, r1\n\
-        strb r0, [r4, 0xB]\n\
-        ldrb r1, [r5, 0x8]\n\
-        lsls r1, 4\n\
-        ands r0, r6\n\
-        orrs r0, r1\n\
-        strb r0, [r4, 0xB]\n\
-        ldrb r1, [r5, 0xA]\n\
-        lsls r1, 28\n\
-        movs r0, 0xF\n\
-        mov r9, r0\n\
-        lsrs r1, 28\n\
-        ldrb r2, [r4, 0x19]\n\
-        mov r0, r8\n\
-        ands r0, r2\n\
-        orrs r0, r1\n\
-        strb r0, [r4, 0x19]\n\
-        ldrb r1, [r5, 0xA]\n\
-        lsrs r1, 4\n\
-        lsls r1, 4\n\
-        ands r0, r6\n\
-        orrs r0, r1\n\
-        strb r0, [r4, 0x19]\n\
-        ldrh r0, [r5, 0xC]\n\
-        strb r0, [r4, 0x7]\n\
-        ldrh r0, [r5, 0xE]\n\
-        strb r0, [r4, 0x1D]\n\
-        ldr r1, _0805E230 @ =gInitialMovementTypeFacingDirections\n\
-        ldrb r0, [r5, 0x9]\n\
-        adds r0, r1\n\
-        ldrb r1, [r0]\n\
-        adds r0, r4, 0\n\
-        adds r0, 0x20\n\
-        strb r1, [r0]\n\
-        ldrb r1, [r0]\n\
-        adds r0, r4, 0\n\
-        bl SetObjectEventDirection\n\
-        adds r0, r4, 0\n\
-        bl SetObjectEventDynamicGraphicsId\n\
-        ldr r1, _0805E234 @ =gRangedMovementTypes\n\
-        ldrb r0, [r4, 0x6]\n\
-        adds r0, r1\n\
-        ldrb r0, [r0]\n\
-        cmp r0, 0\n\
-        beq _0805E21C\n\
-        ldrb r2, [r4, 0x19]\n\
-        adds r0, r6, 0\n\
-        ands r0, r2\n\
-        cmp r0, 0\n\
-        bne _0805E204\n\
-        lsls r0, r2, 28\n\
-        lsrs r0, 28\n\
-        adds r0, 0x1\n\
-        mov r1, r9\n\
-        ands r0, r1\n\
-        mov r1, r8\n\
-        ands r1, r2\n\
-        orrs r1, r0\n\
-        strb r1, [r4, 0x19]\n\
-    _0805E204:\n\
-        ldrb r2, [r4, 0x19]\n\
-        movs r0, 0xF0\n\
-        ands r0, r2\n\
-        cmp r0, 0\n\
-        bne _0805E21C\n\
-        lsrs r1, r2, 4\n\
-        adds r1, 0x1\n\
-        lsls r1, 4\n\
-        adds r0, r6, 0\n\
-        ands r0, r2\n\
-        orrs r0, r1\n\
-        strb r0, [r4, 0x19]\n\
-    _0805E21C:\n\
-        mov r0, sp\n\
-        ldrb r0, [r0]\n\
-    _0805E220:\n\
-        add sp, 0xC\n\
-        pop {r3-r5}\n\
-        mov r8, r3\n\
-        mov r9, r4\n\
-        mov r10, r5\n\
-        pop {r4-r7}\n\
-        pop {r1}\n\
-        bx r1\n\
-        .align 2, 0\n\
-    _0805E230: .4byte gInitialMovementTypeFacingDirections\n\
-    _0805E234: .4byte gRangedMovementTypes\n\
-    ");
-}
-#endif
 
 static bool8 sub_805E238(struct ObjectEventTemplate *template, u8 var, s16 x, s16 y)
 {
@@ -1827,11 +1598,11 @@ static u8 TrySetupObjectEventSprite(struct ObjectEventTemplate *objectEventTempl
     graphicsInfo = GetObjectEventGraphicsInfo(objectEvent->graphicsId);
     if (graphicsInfo->paletteSlot == 0)
     {
-        LoadPlayerObjectReflectionPalette(graphicsInfo->paletteTag1, graphicsInfo->paletteSlot);
+        LoadPlayerObjectReflectionPalette(graphicsInfo->paletteTag, graphicsInfo->paletteSlot);
     }
     else if (graphicsInfo->paletteSlot == 10)
     {
-        LoadSpecialObjectReflectionPalette(graphicsInfo->paletteTag1, graphicsInfo->paletteSlot);
+        LoadSpecialObjectReflectionPalette(graphicsInfo->paletteTag, graphicsInfo->paletteSlot);
     }
 
     if (objectEvent->movementType == MOVEMENT_TYPE_INVISIBLE)
@@ -1846,11 +1617,11 @@ static u8 TrySetupObjectEventSprite(struct ObjectEventTemplate *objectEventTempl
     }
 
     sprite = &gSprites[spriteId];
-    sub_8063AD4(objectEvent->currentCoords.x + cameraX, objectEvent->currentCoords.y + cameraY, &sprite->pos1.x, &sprite->pos1.y);
+    sub_8063AD4(objectEvent->currentCoords.x + cameraX, objectEvent->currentCoords.y + cameraY, &sprite->x, &sprite->y);
     sprite->centerToCornerVecX = -(graphicsInfo->width >> 1);
     sprite->centerToCornerVecY = -(graphicsInfo->height >> 1);
-    sprite->pos1.x += 8;
-    sprite->pos1.y += 16 + sprite->centerToCornerVecY;
+    sprite->x += 8;
+    sprite->y += 16 + sprite->centerToCornerVecY;
     sprite->oam.paletteNum = graphicsInfo->paletteSlot;
     sprite->coordOffsetEnabled = TRUE;
     sprite->data[0] = objectEventId;
@@ -1934,7 +1705,7 @@ void MakeObjectTemplateFromObjectEventGraphicsInfo(u16 graphicsId, void (*callba
     const struct ObjectEventGraphicsInfo *graphicsInfo = GetObjectEventGraphicsInfo(graphicsId);
 
     spriteTemplate->tileTag = graphicsInfo->tileTag;
-    spriteTemplate->paletteTag = graphicsInfo->paletteTag1;
+    spriteTemplate->paletteTag = graphicsInfo->paletteTag;
     spriteTemplate->oam = graphicsInfo->oam;
     spriteTemplate->anims = graphicsInfo->anims;
     spriteTemplate->images = graphicsInfo->images;
@@ -2001,14 +1772,14 @@ u8 sprite_new(u8 graphicsId, u8 a1, s16 x, s16 y, u8 z, u8 direction)
         sprite = &gSprites[spriteId];
         sprite->centerToCornerVecX = -(graphicsInfo->width >> 1);
         sprite->centerToCornerVecY = -(graphicsInfo->height >> 1);
-        sprite->pos1.y += sprite->centerToCornerVecY;
+        sprite->y += sprite->centerToCornerVecY;
         sprite->oam.paletteNum = graphicsInfo->paletteSlot;
         sprite->coordOffsetEnabled = TRUE;
         sprite->data[0] = a1;
         sprite->data[1] = z;
         if (graphicsInfo->paletteSlot == 10)
         {
-            LoadSpecialObjectReflectionPalette(graphicsInfo->paletteTag1, graphicsInfo->paletteSlot);
+            LoadSpecialObjectReflectionPalette(graphicsInfo->paletteTag, graphicsInfo->paletteSlot);
         }
 
         if (subspriteTables != NULL)
@@ -2040,12 +1811,12 @@ u8 sub_805EB44(u8 graphicsId, u8 a1, s16 x, s16 y)
     {
         sprite = &gSprites[spriteId];
         sprite->centerToCornerVecY = -(graphicsInfo->height >> 1);
-        sprite->pos1.y += sprite->centerToCornerVecY;
+        sprite->y += sprite->centerToCornerVecY;
         sprite->oam.paletteNum = graphicsInfo->paletteSlot;
         sprite->data[0] = a1;
         if (graphicsInfo->paletteSlot == 10)
         {
-            LoadSpecialObjectReflectionPalette(graphicsInfo->paletteTag1, graphicsInfo->paletteSlot);
+            LoadSpecialObjectReflectionPalette(graphicsInfo->paletteTag, graphicsInfo->paletteSlot);
         }
 
         if (subspriteTables != NULL)
@@ -2123,7 +1894,7 @@ static void RemoveObjectEventIfOutsideView(struct ObjectEvent *objectEvent)
     RemoveObjectEvent(objectEvent);
 }
 
-void sub_805EDF0(s16 x, s16 y)
+void ReloadMapObjectsWithOffset(s16 x, s16 y)
 {
     u8 i;
 
@@ -2132,13 +1903,13 @@ void sub_805EDF0(s16 x, s16 y)
     {
         if (gObjectEvents[i].active)
         {
-            sub_805EE3C(i, x, y);
+            ReloadMapObjectWithOffset(i, x, y);
         }
     }
     CreateReflectionEffectSprites();
 }
 
-static void sub_805EE3C(u8 objectEventId, s16 x, s16 y)
+static void ReloadMapObjectWithOffset(u8 objectEventId, s16 x, s16 y)
 {
     u8 spriteId;
     struct Sprite *sprite;
@@ -2159,9 +1930,7 @@ static void sub_805EE3C(u8 objectEventId, s16 x, s16 y)
 #undef i
 
     objectEvent = &gObjectEvents[objectEventId];
-    #ifndef NONMATCHING
-        asm("":::"r5");
-    #endif
+    objectEvent++;objectEvent--; // fakematch
     subspriteTables = NULL;
     graphicsInfo = GetObjectEventGraphicsInfo(objectEvent->graphicsId);
     spriteFrameImage.size = graphicsInfo->size;
@@ -2170,22 +1939,22 @@ static void sub_805EE3C(u8 objectEventId, s16 x, s16 y)
     *(u16 *)&spriteTemplate.paletteTag = SPRITE_INVALID_TAG;
     if (graphicsInfo->paletteSlot == 0)
     {
-        LoadPlayerObjectReflectionPalette(graphicsInfo->paletteTag1, graphicsInfo->paletteSlot);
+        LoadPlayerObjectReflectionPalette(graphicsInfo->paletteTag, graphicsInfo->paletteSlot);
     }
     if (graphicsInfo->paletteSlot > 9)
     {
-        LoadSpecialObjectReflectionPalette(graphicsInfo->paletteTag1, graphicsInfo->paletteSlot);
+        LoadSpecialObjectReflectionPalette(graphicsInfo->paletteTag, graphicsInfo->paletteSlot);
     }
     *(u16 *)&spriteTemplate.paletteTag = SPRITE_INVALID_TAG;
     spriteId = CreateSprite(&spriteTemplate, 0, 0, 0);
     if (spriteId != MAX_SPRITES)
     {
         sprite = &gSprites[spriteId];
-        sub_8063AD4(x + objectEvent->currentCoords.x, y + objectEvent->currentCoords.y, &sprite->pos1.x, &sprite->pos1.y);
+        sub_8063AD4(x + objectEvent->currentCoords.x, y + objectEvent->currentCoords.y, &sprite->x, &sprite->y);
         sprite->centerToCornerVecX = -(graphicsInfo->width >> 1);
         sprite->centerToCornerVecY = -(graphicsInfo->height >> 1);
-        sprite->pos1.x += 8;
-        sprite->pos1.y += 16 + sprite->centerToCornerVecY;
+        sprite->x += 8;
+        sprite->y += 16 + sprite->centerToCornerVecY;
         sprite->images = graphicsInfo->images;
         if (objectEvent->movementType == MOVEMENT_TYPE_PLAYER)
         {
@@ -2227,7 +1996,7 @@ static void SetPlayerAvatarObjectEventIdAndObjectId(u8 objectEventId, u8 spriteI
     gPlayerAvatar.objectEventId = objectEventId;
     gPlayerAvatar.spriteId = spriteId;
     gPlayerAvatar.gender = GetPlayerAvatarGenderByGraphicsId(gObjectEvents[objectEventId].graphicsId);
-    SetPlayerAvatarExtraStateTransition(gObjectEvents[objectEventId].graphicsId, 0x20);
+    SetPlayerAvatarExtraStateTransition(gObjectEvents[objectEventId].graphicsId, PLAYER_AVATAR_FLAG_CONTROLLABLE);
 }
 
 void ObjectEventSetGraphicsId(struct ObjectEvent *objectEvent, u8 graphicsId)
@@ -2241,17 +2010,17 @@ void ObjectEventSetGraphicsId(struct ObjectEvent *objectEvent, u8 graphicsId)
     sprite = &gSprites[objectEvent->spriteId];
     if (graphicsInfo->paletteSlot == 0)
     {
-        PatchObjectPalette(graphicsInfo->paletteTag1, graphicsInfo->paletteSlot);
+        PatchObjectPalette(graphicsInfo->paletteTag, graphicsInfo->paletteSlot);
     }
     if (graphicsInfo->paletteSlot == 10)
     {
-        LoadSpecialObjectReflectionPalette(graphicsInfo->paletteTag1, graphicsInfo->paletteSlot);
+        LoadSpecialObjectReflectionPalette(graphicsInfo->paletteTag, graphicsInfo->paletteSlot);
     }
     
     var = sprite->images->size / TILE_SIZE_4BPP;
     if (!sprite->usingSheet)
     {
-        sub_80075C0(sprite);
+        FreeSpriteTilesIfNotUsingSheet(sprite);
     }
     sprite->oam.shape = graphicsInfo->oam->shape;
     sprite->oam.size = graphicsInfo->oam->size;
@@ -2272,11 +2041,11 @@ void ObjectEventSetGraphicsId(struct ObjectEvent *objectEvent, u8 graphicsId)
     }
     objectEvent->inanimate = graphicsInfo->inanimate;
     objectEvent->graphicsId = graphicsId;  
-    SetSpritePosToMapCoords(objectEvent->currentCoords.x, objectEvent->currentCoords.y, &sprite->pos1.x, &sprite->pos1.y);
+    SetSpritePosToMapCoords(objectEvent->currentCoords.x, objectEvent->currentCoords.y, &sprite->x, &sprite->y);
     sprite->centerToCornerVecX = -(graphicsInfo->width >> 1);
     sprite->centerToCornerVecY = -(graphicsInfo->height >> 1);
-    sprite->pos1.x += 8;
-    sprite->pos1.y += 16 + sprite->centerToCornerVecY;
+    sprite->x += 8;
+    sprite->y += 16 + sprite->centerToCornerVecY;
     if (objectEvent->trackedByCamera)
     {
         CameraObjectReset1();
@@ -2337,7 +2106,7 @@ static void SetObjectEventDynamicGraphicsId(struct ObjectEvent *objectEvent)
     }
 }
 
-void npc_by_local_id_and_map_set_field_1_bit_x20(u8 localId, u8 mapNum, u8 mapGroup, u8 state)
+void ShowOrHideObjectByLocalIdAndMap(u8 localId, u8 mapNum, u8 mapGroup, u8 state)
 {
     u8 objectEventId;
 
@@ -2354,7 +2123,7 @@ void ObjectEventGetLocalIdAndMap(struct ObjectEvent *objectEvent, void *localId,
     *(u8*)(mapGroup) = objectEvent->mapGroup;
 }
 
-void sub_805F378(s16 x, s16 y)
+void EnableObjectGroundEffectsByXY(s16 x, s16 y)
 {
     u8 objectEventId;
     struct ObjectEvent *objectEvent;
@@ -2367,7 +2136,7 @@ void sub_805F378(s16 x, s16 y)
     }
 }
 
-void sub_805F3A8(u8 localId, u8 mapNum, u8 mapGroup, u8 subpriority)
+void SetObjectPriorityByLocalIdAndMap(u8 localId, u8 mapNum, u8 mapGroup, u8 subpriority)
 {
     u8 objectEventId;
     struct ObjectEvent *objectEvent;
@@ -2382,7 +2151,7 @@ void sub_805F3A8(u8 localId, u8 mapNum, u8 mapGroup, u8 subpriority)
     }
 }
 
-void sub_805F400(u8 localId, u8 mapNum, u8 mapGroup)
+void UnfixObjectPriorityByLocalIdAndMap(u8 localId, u8 mapNum, u8 mapGroup)
 {
     u8 objectEventId;
     struct ObjectEvent *objectEvent;
@@ -2395,7 +2164,7 @@ void sub_805F400(u8 localId, u8 mapNum, u8 mapGroup)
     }
 }
 
-void sub_808E82C(u8 localId, u8 mapNum, u8 mapGroup, s16 x, s16 y)
+void SetObjectPositionByLocalIdAndMap(u8 localId, u8 mapNum, u8 mapGroup, s16 x, s16 y)
 {
     u8 objectEventId;
     struct Sprite *sprite;
@@ -2403,8 +2172,8 @@ void sub_808E82C(u8 localId, u8 mapNum, u8 mapGroup, s16 x, s16 y)
     if (!TryGetObjectEventIdByLocalIdAndMap(localId, mapNum, mapGroup, &objectEventId))
     {
         sprite = &gSprites[gObjectEvents[objectEventId].spriteId];
-        sprite->pos2.x = x;
-        sprite->pos2.y = y;
+        sprite->x2 = x;
+        sprite->y2 = y;
     }
 }
 
@@ -2418,9 +2187,13 @@ static void LoadObjectEventPalette(u16 paletteTag)
 {
     u16 i = FindObjectEventPaletteIndexByTag(paletteTag);
 
+#ifdef BUGFIX
+    if (sObjectEventSpritePalettes[i].tag != OBJ_EVENT_PAL_TAG_NONE)
+#else
     if (i != OBJ_EVENT_PAL_TAG_NONE) // always true
+#endif
     {
-        sub_805F510(&sObjectEventSpritePalettes[i]);
+        TryLoadObjectPalette(&sObjectEventSpritePalettes[i]);
     }
 }
 
@@ -2434,10 +2207,11 @@ void Unused_LoadObjectEventPaletteSet(u16 *paletteTags)
     }
 }
 
-static u8 sub_805F510(const struct SpritePalette *spritePalette)
+static u8 TryLoadObjectPalette(const struct SpritePalette *spritePalette)
 {
     if (IndexOfSpritePaletteTag(spritePalette->tag) != 0xFF)
     {
+        // Already loaded
         return 0xFF;
     }
     return LoadSpritePalette(spritePalette);
@@ -2448,7 +2222,7 @@ void PatchObjectPalette(u16 paletteTag, u8 paletteSlot)
     u8 paletteIndex = FindObjectEventPaletteIndexByTag(paletteTag);
 
     LoadPalette(sObjectEventSpritePalettes[paletteIndex].data, 16 * paletteSlot + 0x100, 0x20);
-    sub_8083598(paletteSlot);
+    ApplyGlobalFieldPaletteTint(paletteSlot);
 }
 
 void PatchObjectPaletteRange(const u16 *paletteTags, u8 minSlot, u8 maxSlot)
@@ -2543,11 +2317,11 @@ void MoveObjectEventToMapCoords(struct ObjectEvent *objectEvent, s16 x, s16 y)
     sprite = &gSprites[objectEvent->spriteId];
     graphicsInfo = GetObjectEventGraphicsInfo(objectEvent->graphicsId);
     SetObjectEventCoords(objectEvent, x, y);
-    SetSpritePosToMapCoords(objectEvent->currentCoords.x, objectEvent->currentCoords.y, &sprite->pos1.x, &sprite->pos1.y);
+    SetSpritePosToMapCoords(objectEvent->currentCoords.x, objectEvent->currentCoords.y, &sprite->x, &sprite->y);
     sprite->centerToCornerVecX = -(graphicsInfo->width >> 1);
     sprite->centerToCornerVecY = -(graphicsInfo->height >> 1);
-    sprite->pos1.x += 8;
-    sprite->pos1.y += 16 + sprite->centerToCornerVecY;
+    sprite->x += 8;
+    sprite->y += 16 + sprite->centerToCornerVecY;
     sub_805EFF4(objectEvent);
     if (objectEvent->trackedByCamera)
         CameraObjectReset1();
@@ -2646,8 +2420,8 @@ static void ObjectCB_CameraObject(struct Sprite *sprite)
 
 static void CameraObject_0(struct Sprite *sprite)
 {
-    sprite->pos1.x = gSprites[sprite->data[0]].pos1.x;
-    sprite->pos1.y = gSprites[sprite->data[0]].pos1.y;
+    sprite->x = gSprites[sprite->data[0]].x;
+    sprite->y = gSprites[sprite->data[0]].y;
     sprite->invisible = TRUE;
     sprite->data[1] = 1;
     CameraObject_1(sprite);
@@ -2655,19 +2429,19 @@ static void CameraObject_0(struct Sprite *sprite)
 
 static void CameraObject_1(struct Sprite *sprite)
 {
-    s16 x = gSprites[sprite->data[0]].pos1.x;
-    s16 y = gSprites[sprite->data[0]].pos1.y;
+    s16 x = gSprites[sprite->data[0]].x;
+    s16 y = gSprites[sprite->data[0]].y;
 
-    sprite->data[2] = x - sprite->pos1.x;
-    sprite->data[3] = y - sprite->pos1.y;
-    sprite->pos1.x = x;
-    sprite->pos1.y = y;
+    sprite->data[2] = x - sprite->x;
+    sprite->data[3] = y - sprite->y;
+    sprite->x = x;
+    sprite->y = y;
 }
 
 static void CameraObject_2(struct Sprite *sprite)
 {
-    sprite->pos1.x = gSprites[sprite->data[0]].pos1.x;
-    sprite->pos1.y = gSprites[sprite->data[0]].pos1.y;
+    sprite->x = gSprites[sprite->data[0]].x;
+    sprite->y = gSprites[sprite->data[0]].y;
     sprite->data[2] = 0;
     sprite->data[3] = 0;
 }
@@ -2736,8 +2510,8 @@ u8 CopySprite(struct Sprite *sprite, s16 x, s16 y, u8 subpriority)
         if (!gSprites[i].inUse)
         {
             gSprites[i] = *sprite;
-            gSprites[i].pos1.x = x;
-            gSprites[i].pos1.y = y;
+            gSprites[i].x = x;
+            gSprites[i].y = y;
             gSprites[i].subpriority = subpriority;
             break;
         }
@@ -2754,8 +2528,8 @@ u8 CreateCopySpriteAt(struct Sprite *sprite, s16 x, s16 y, u8 subpriority)
         if (!gSprites[i].inUse)
         {
             gSprites[i] = *sprite;
-            gSprites[i].pos1.x = x;
-            gSprites[i].pos1.y = y;
+            gSprites[i].x = x;
+            gSprites[i].y = y;
             gSprites[i].subpriority = subpriority;
             return i;
         }
@@ -2787,7 +2561,13 @@ const u8 *GetObjectEventScriptPointerByObjectEventId(u8 objectEventId)
 
 static u16 GetObjectEventFlagIdByLocalIdAndMap(u8 localId, u8 mapNum, u8 mapGroup)
 {
-    return GetObjectEventTemplateByLocalIdAndMap(localId, mapNum, mapGroup)->flagId;
+    struct ObjectEventTemplate *obj = GetObjectEventTemplateByLocalIdAndMap(localId, mapNum, mapGroup);
+#ifdef UBFIX
+    // BUG: The function may return NULL, and attempting to read from NULL may freeze the game using modern compilers.
+    if (obj == NULL)
+        return 0;
+#endif // UBFIX
+    return obj->flagId;
 }
 
 static u16 GetObjectEventFlagIdByObjectEventId(u8 objectEventId)
@@ -2950,7 +2730,7 @@ u16 GetObjectPaletteTag(u8 palSlot)
 
 movement_type_empty_callback(MovementType_None)
 movement_type_def(MovementType_WanderAround, gMovementTypeFuncs_WanderAround)
-movement_type_def(MovementType_WanderAroundDuplicate, gMovementTypeFuncs_WanderAroundDuplicate)
+movement_type_def(MovementType_WanderAroundSlowest, gMovementTypeFuncs_WanderAroundSlowest)
 
 static bool8 MovementType_WanderAround_Step0(struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
@@ -3010,9 +2790,9 @@ static bool8 MovementType_WanderAround_Step5(struct ObjectEvent *objectEvent, st
     return TRUE;
 }
 
-static bool8 MovementType_WanderAround_Step5Duplicate(struct ObjectEvent *objectEvent, struct Sprite *sprite)
+static bool8 MovementType_WanderAround_Step5Slowest(struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
-    ObjectEventSetSingleMovement(objectEvent, sprite, sub_8063F2C(objectEvent->movementDirection));
+    ObjectEventSetSingleMovement(objectEvent, sprite, GetWalkSlowestMovementAction(objectEvent->movementDirection));
     objectEvent->singleMovementActive = TRUE;
     sprite->data[1] = 6;
     return TRUE;
@@ -4739,7 +4519,7 @@ static void MovementType_MountainDisguise(struct Sprite *sprite)
     UpdateObjectEventCurrentMovement(&gObjectEvents[sprite->data[0]], sprite, MovementType_Disguise_Callback);
 }
 
-static void MovementType_Hidden(struct Sprite *sprite)
+static void MovementType_Buried(struct Sprite *sprite)
 {
     if (!sprite->data[7])
     {
@@ -4748,15 +4528,15 @@ static void MovementType_Hidden(struct Sprite *sprite)
         sprite->oam.priority = 3;
         sprite->data[7]++;
     }
-    UpdateObjectEventCurrentMovement(&gObjectEvents[sprite->data[0]], sprite, MovementType_Hidden_Callback);
+    UpdateObjectEventCurrentMovement(&gObjectEvents[sprite->data[0]], sprite, MovementType_Buried_Callback);
 }
 
-static bool8 MovementType_Hidden_Callback(struct ObjectEvent *objectEvent, struct Sprite *sprite)
+static bool8 MovementType_Buried_Callback(struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
-    return gMovementTypeFuncs_Hidden[sprite->data[1]](objectEvent, sprite);
+    return gMovementTypeFuncs_Buried[sprite->data[1]](objectEvent, sprite);
 }
 
-static bool8 MovementType_Hidden_Step0(struct ObjectEvent *objectEvent, struct Sprite *sprite)
+static bool8 MovementType_Buried_Step0(struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
     ClearObjectEventMovement(objectEvent, sprite);
     return FALSE;
@@ -4828,45 +4608,45 @@ static bool8 MovementType_Invisible_Step2(struct ObjectEvent *objectEvent, struc
     return FALSE;
 }
 
-void sub_8063298(struct Sprite *sprite)
+void MovementType_VsSeeker4D(struct Sprite *sprite)
 {
-    UpdateObjectEventCurrentMovement(&gObjectEvents[sprite->data[0]], sprite, sub_8063304);
+    UpdateObjectEventCurrentMovement(&gObjectEvents[sprite->data[0]], sprite, MovementType_VsSeeker4D_Callback);
 }
 
-void sub_80632BC(struct Sprite *sprite)
+void MovementType_VsSeeker4E(struct Sprite *sprite)
 {
-    UpdateObjectEventCurrentMovement(&gObjectEvents[sprite->data[0]], sprite, sub_8063324);
+    UpdateObjectEventCurrentMovement(&gObjectEvents[sprite->data[0]], sprite, MovementType_VsSeeker4E_Callback);
 }
 
-void sub_80632E0(struct Sprite *sprite)
+void MovementType_VsSeeker4F(struct Sprite *sprite)
 {
-    UpdateObjectEventCurrentMovement(&gObjectEvents[sprite->data[0]], sprite, sub_8063344);
+    UpdateObjectEventCurrentMovement(&gObjectEvents[sprite->data[0]], sprite, MovementType_VsSeeker4F_Callback);
 }
 
-static u8 sub_8063304(struct ObjectEvent *objectEvent, struct Sprite *sprite)
+static u8 MovementType_VsSeeker4D_Callback(struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
-    return gUnknown_83A63F0[sprite->data[1]](objectEvent, sprite);
+    return gMovementTypeFuncs_VsSeeker4D[sprite->data[1]](objectEvent, sprite);
 }
 
-static u8 sub_8063324(struct ObjectEvent *objectEvent, struct Sprite *sprite)
+static u8 MovementType_VsSeeker4E_Callback(struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
-    return gUnknown_83A63FC[sprite->data[1]](objectEvent, sprite);
+    return gMovementTypeFuncs_VsSeeker4E[sprite->data[1]](objectEvent, sprite);
 }
 
-static u8 sub_8063344(struct ObjectEvent *objectEvent, struct Sprite *sprite)
+static u8 MovementType_VsSeeker4F_Callback(struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
-    return gUnknown_83A6404[sprite->data[1]](objectEvent, sprite);
+    return gMovementTypeFuncs_VsSeeker4F[sprite->data[1]](objectEvent, sprite);
 }
 
-static bool8 sub_8063364(struct ObjectEvent *objectEvent, struct Sprite *sprite)
+static bool8 MovementType_VsSeeker4D_Step0(struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
     ClearObjectEventMovement(objectEvent, sprite);
-    ObjectEventSetSingleMovement(objectEvent, sprite, 0x98);
+    ObjectEventSetSingleMovement(objectEvent, sprite, MOVEMENT_ACTION_0x98);
     sprite->data[1] = 1;
     return TRUE;
 }
 
-static bool8 sub_8063384(struct ObjectEvent *objectEvent, struct Sprite *sprite)
+static bool8 MovementType_VsSeeker4D_Step1(struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
     if (ObjectEventExecSingleMovementAction(objectEvent, sprite))
     {
@@ -4876,29 +4656,29 @@ static bool8 sub_8063384(struct ObjectEvent *objectEvent, struct Sprite *sprite)
     return FALSE;
 }
 
-static bool8 sub_80633A4(struct ObjectEvent *objectEvent, struct Sprite *sprite)
+static bool8 MovementType_VsSeeker4D_Step2(struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
     objectEvent->singleMovementActive = FALSE;
     return FALSE;
 }
 
-static bool8 sub_80633B4(struct ObjectEvent *objectEvent, struct Sprite *sprite)
+static bool8 MovementType_VsSeeker4E_Step0(struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
     ClearObjectEventMovement(objectEvent, sprite);
-    ObjectEventSetSingleMovement(objectEvent, sprite, 0x99);
+    ObjectEventSetSingleMovement(objectEvent, sprite, MOVEMENT_ACTION_0x99);
     sprite->data[1] = 1;
     return FALSE;
 }
 
-static bool8 sub_80633D4(struct ObjectEvent *objectEvent, struct Sprite *sprite)
+static bool8 MovementType_VsSeeker4F_Step0(struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
     ClearObjectEventMovement(objectEvent, sprite);
-    ObjectEventSetSingleMovement(objectEvent, sprite, 0x9A);
+    ObjectEventSetSingleMovement(objectEvent, sprite, MOVEMENT_ACTION_0x9A);
     sprite->data[1] = 1;
     return FALSE;
 }
 
-static bool8 sub_80633F4(struct ObjectEvent *objectEvent, struct Sprite *sprite)
+static bool8 MovementType_VsSeeker4E_VsSeeker4F_Step1(struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
     if (ObjectEventExecSingleMovementAction(objectEvent, sprite))
     {
@@ -5136,19 +4916,19 @@ static bool8 IsCoordOutsideObjectEventMovementRange(struct ObjectEvent *objectEv
     s16 top;
     s16 bottom;
 
-    if (objectEvent->range.as_nybbles.x != 0)
+    if (objectEvent->rangeX != 0)
     {
-        left = objectEvent->initialCoords.x - objectEvent->range.as_nybbles.x;
-        right = objectEvent->initialCoords.x + objectEvent->range.as_nybbles.x;
+        left = objectEvent->initialCoords.x - objectEvent->rangeX;
+        right = objectEvent->initialCoords.x + objectEvent->rangeX;
         if (left > x || right < x)
         {
             return TRUE;
         }
     }
-    if (objectEvent->range.as_nybbles.y != 0)
+    if (objectEvent->rangeY != 0)
     {
-        top = objectEvent->initialCoords.y - objectEvent->range.as_nybbles.y;
-        bottom = objectEvent->initialCoords.y + objectEvent->range.as_nybbles.y;
+        top = objectEvent->initialCoords.y - objectEvent->rangeY;
+        bottom = objectEvent->initialCoords.y + objectEvent->rangeY;
         if (top > y || bottom < y)
         {
             return TRUE;
@@ -5447,7 +5227,7 @@ u8 sub_8063F10(u32 idx)
     return gUnknown_83A64F6[direction];
 }
 
-dirn_to_anim(sub_8063F2C, gUnknown_83A64FB);
+dirn_to_anim(GetWalkSlowestMovementAction, gUnknown_83A64FB);
 dirn_to_anim(GetWalkSlowMovementAction, gUnknown_83A6500);
 dirn_to_anim(GetWalkNormalMovementAction, gUnknown_83A6505);
 dirn_to_anim(GetWalkFastMovementAction, gUnknown_83A650A);
@@ -5457,7 +5237,7 @@ dirn_to_anim(GetWalkFastestMovementAction, gUnknown_83A6519);
 dirn_to_anim(GetSlideMovementAction, gUnknown_83A651E);
 dirn_to_anim(GetPlayerRunMovementAction, gUnknown_83A6523);
 dirn_to_anim(GetPlayerRunSlowMovementAction, gUnknown_83A6528);
-dirn_to_anim(sub_80640E4, gUnknown_83A652D);
+dirn_to_anim(GetSpinMovementAction, gUnknown_83A652D);
 dirn_to_anim(GetJump2MovementAction, gUnknown_83A6532);
 dirn_to_anim(GetJumpInPlaceMovementAction, gUnknown_83A6537);
 dirn_to_anim(GetJumpInPlaceTurnAroundMovementAction, gUnknown_83A653C);
@@ -5553,7 +5333,7 @@ static void ObjectEventSetSingleMovement(struct ObjectEvent *objectEvent, struct
     
     if (gQuestLogPlaybackState == 2)
     {
-        sub_81124EC(objectEvent->localId, objectEvent->mapNum, objectEvent->mapGroup, animId);
+        QuestLogRecordNPCStep(objectEvent->localId, objectEvent->mapNum, objectEvent->mapGroup, animId);
     }
 }
 
@@ -7382,7 +7162,7 @@ static bool8 do_smile_bubble(struct ObjectEvent *objectEvent, struct Sprite *spr
 
 static bool8 MovementAction_RevealTrainer_Step0(struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
-    if (objectEvent->movementType == MOVEMENT_TYPE_HIDDEN)
+    if (objectEvent->movementType == MOVEMENT_TYPE_BURIED)
     {
         MovementAction_RevealTrainer_RunTrainerSeeFuncList(objectEvent);
         return FALSE;
@@ -8104,7 +7884,6 @@ static bool8 MovementActionFunc_x98_1(struct ObjectEvent *objectEvent, struct Sp
 
 static bool8 MovementActionFunc_x99_1(struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
-    s32 y;
     switch (sprite->data[7])
     {
     case 0:
@@ -8117,8 +7896,8 @@ static bool8 MovementActionFunc_x99_1(struct ObjectEvent *objectEvent, struct Sp
             sprite->animPaused = FALSE;
             objectEvent->disableAnim = FALSE;
         }
-        y = -(3 * gSineTable[sprite->data[6]] >> 7);
-        objectEvent->singleMovementActive = (-(sprite->pos2.y = y) | y) >> 31;
+        sprite->y2 = -(3 * gSineTable[sprite->data[6]] >> 7);
+        objectEvent->singleMovementActive = sprite->y2 != 0;
         return FALSE;
     case 1:
         if (++sprite->data[4] > 16)
@@ -8153,7 +7932,7 @@ static bool8 MovementActionFunc_x9A_1(struct ObjectEvent *objectEvent, struct Sp
 {
     bool8 ret;
     sprite->data[7] = (sprite->data[7] + 4) & 0xFF;
-    sprite->pos2.x = gSineTable[sprite->data[7]] >> 7;
+    sprite->x2 = gSineTable[sprite->data[7]] >> 7;
     if (sprite->data[7] == 0)
         ret = TRUE;
     else
@@ -8188,30 +7967,30 @@ static bool8 MovementAction_PauseSpriteAnim(struct ObjectEvent *objectEvent, str
 
 static bool8 MovementActionFunc_xA4_0(struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
-    sprite->pos2.y = 0;
+    sprite->y2 = 0;
     sprite->data[2]++;
     return FALSE;
 }
 
 static bool8 MovementActionFunc_xA4_1(struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
-    sprite->pos2.y -= 8;
-    if (sprite->pos2.y == -160)
+    sprite->y2 -= 8;
+    if (sprite->y2 == -160)
         sprite->data[2]++;
     return FALSE;
 }
 
 static bool8 MovementActionFunc_xA5_0(struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
-    sprite->pos2.y = -160;
+    sprite->y2 = -160;
     sprite->data[2]++;
     return FALSE;
 }
 
 static bool8 MovementActionFunc_xA5_1(struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
-    sprite->pos2.y += 8;
-    if (sprite->pos2.y == 0)
+    sprite->y2 += 8;
+    if (sprite->y2 == 0)
         sprite->data[2]++;
     return FALSE;
 }
@@ -8241,11 +8020,11 @@ static void TryEnableObjectEventAnim(struct ObjectEvent *objectEvent, struct Spr
 
 static void UpdateObjectEventVisibility(struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
-    sub_8067A10(objectEvent, sprite);
+    CalcWhetherObjectIsOffscreen(objectEvent, sprite);
     UpdateObjEventSpriteVisibility(objectEvent, sprite);
 }
 
-static void sub_8067A10(struct ObjectEvent *objectEvent, struct Sprite *sprite)
+static void CalcWhetherObjectIsOffscreen(struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
     u16 x, y;
     u16 x2, y2;
@@ -8256,13 +8035,13 @@ static void sub_8067A10(struct ObjectEvent *objectEvent, struct Sprite *sprite)
     graphicsInfo = GetObjectEventGraphicsInfo(objectEvent->graphicsId);
     if (sprite->coordOffsetEnabled)
     {
-        x = sprite->pos1.x + sprite->pos2.x + sprite->centerToCornerVecX + gSpriteCoordOffsetX;
-        y = sprite->pos1.y + sprite->pos2.y + sprite->centerToCornerVecY + gSpriteCoordOffsetY;
+        x = sprite->x + sprite->x2 + sprite->centerToCornerVecX + gSpriteCoordOffsetX;
+        y = sprite->y + sprite->y2 + sprite->centerToCornerVecY + gSpriteCoordOffsetY;
     }
     else
     {
-        x = sprite->pos1.x + sprite->pos2.x + sprite->centerToCornerVecX;
-        y = sprite->pos1.y + sprite->pos2.y + sprite->centerToCornerVecY;
+        x = sprite->x + sprite->x2 + sprite->centerToCornerVecX;
+        y = sprite->y + sprite->y2 + sprite->centerToCornerVecY;
     }
     x2 = graphicsInfo->width + (s16)x;
     y2 = graphicsInfo->height + (s16)y;
@@ -8692,7 +8471,7 @@ void ObjectEventUpdateZCoord(struct ObjectEvent *objEvent)
 void SetObjectSubpriorityByZCoord(u8 a, struct Sprite *sprite, u8 b)
 {
     s32 tmp = sprite->centerToCornerVecY;
-    u32 tmpa = *(u16 *)&sprite->pos1.y;
+    u32 tmpa = *(u16 *)&sprite->y;
     u32 tmpb = *(u16 *)&gSpriteCoordOffsetY;
     s32 tmp2 = (tmpa - tmp) + tmpb;
     u16 tmp3 = (0x10 - ((((u32)tmp2 + 8) & 0xFF) >> 4)) * 2;
@@ -9108,32 +8887,32 @@ void UnfreezeObjectEvents(void)
 
 static void little_step(struct Sprite * sprite, u8 direction)
 {
-    sprite->pos1.x += sDirectionToVectors[direction].x;
-    sprite->pos1.y += sDirectionToVectors[direction].y;
+    sprite->x += sDirectionToVectors[direction].x;
+    sprite->y += sDirectionToVectors[direction].y;
 }
 
 static void double_little_steps(struct Sprite * sprite, u8 direction)
 {
-    sprite->pos1.x += 2 * (u16)sDirectionToVectors[direction].x;
-    sprite->pos1.y += 2 * (u16)sDirectionToVectors[direction].y;
+    sprite->x += 2 * (u16)sDirectionToVectors[direction].x;
+    sprite->y += 2 * (u16)sDirectionToVectors[direction].y;
 }
 
 static void triple_little_steps(struct Sprite * sprite, u8 direction)
 {
-    sprite->pos1.x += 2 * (u16)sDirectionToVectors[direction].x + (u16)sDirectionToVectors[direction].x;
-    sprite->pos1.y += 2 * (u16)sDirectionToVectors[direction].y + (u16)sDirectionToVectors[direction].y;
+    sprite->x += 2 * (u16)sDirectionToVectors[direction].x + (u16)sDirectionToVectors[direction].x;
+    sprite->y += 2 * (u16)sDirectionToVectors[direction].y + (u16)sDirectionToVectors[direction].y;
 }
 
 static void quad_little_steps(struct Sprite * sprite, u8 direction)
 {
-    sprite->pos1.x += 4 * (u16)sDirectionToVectors[direction].x;
-    sprite->pos1.y += 4 * (u16)sDirectionToVectors[direction].y;
+    sprite->x += 4 * (u16)sDirectionToVectors[direction].x;
+    sprite->y += 4 * (u16)sDirectionToVectors[direction].y;
 }
 
 static void oct_little_steps(struct Sprite * sprite, u8 direction)
 {
-    sprite->pos1.x += 8 * (u16)sDirectionToVectors[direction].x;
-    sprite->pos1.y += 8 * (u16)sDirectionToVectors[direction].y;
+    sprite->x += 8 * (u16)sDirectionToVectors[direction].x;
+    sprite->y += 8 * (u16)sDirectionToVectors[direction].y;
 }
 
 void oamt_npc_ministep_reset(struct Sprite * sprite, u8 direction, u8 speed)
@@ -9379,7 +9158,7 @@ u8 sub_8068D3C(struct Sprite *sprite)
     if (sprite->tJumpSpeed != 0)
         little_step(sprite, sprite->tDirection);
 
-    sprite->pos2.y = GetJumpYDisplacement(sprite->tStepNo >> shifts[sprite->tJumpSpeed], sprite->tJumpHeight);
+    sprite->y2 = GetJumpYDisplacement(sprite->tStepNo >> shifts[sprite->tJumpSpeed], sprite->tJumpHeight);
 
     sprite->tStepNo++;
 
@@ -9388,7 +9167,7 @@ u8 sub_8068D3C(struct Sprite *sprite)
 
     if (sprite->tStepNo >= duration[sprite->tJumpSpeed])
     {
-        sprite->pos2.y = 0;
+        sprite->y2 = 0;
         jumpPhase = -1;
     }
 
@@ -9404,7 +9183,7 @@ u8 sub_8068DC4(struct Sprite *sprite)
     if (sprite->tJumpSpeed != 0 && !(sprite->tStepNo & 1))
         little_step(sprite, sprite->tDirection);
 
-    sprite->pos2.y = GetJumpYDisplacement(sprite->tStepNo >> shifts[sprite->tJumpSpeed], sprite->tJumpHeight);
+    sprite->y2 = GetJumpYDisplacement(sprite->tStepNo >> shifts[sprite->tJumpSpeed], sprite->tJumpHeight);
 
     sprite->tStepNo++;
 
@@ -9413,7 +9192,7 @@ u8 sub_8068DC4(struct Sprite *sprite)
 
     if (sprite->tStepNo >= duration[sprite->tJumpSpeed])
     {
-        sprite->pos2.y = 0;
+        sprite->y2 = 0;
         jumpPhase = -1;
     }
 
@@ -9468,13 +9247,13 @@ void UpdateObjectEventSpriteVisibility(struct Sprite *sprite, bool8 invisible)
 
     if (sprite->coordOffsetEnabled)
     {
-        x = sprite->pos1.x + sprite->pos2.x + sprite->centerToCornerVecX + gSpriteCoordOffsetX;
-        y = sprite->pos1.y + sprite->pos2.y + sprite->centerToCornerVecY + gSpriteCoordOffsetY;
+        x = sprite->x + sprite->x2 + sprite->centerToCornerVecX + gSpriteCoordOffsetX;
+        y = sprite->y + sprite->y2 + sprite->centerToCornerVecY + gSpriteCoordOffsetY;
     }
     else
     {
-        x = sprite->pos1.x + sprite->pos2.x + sprite->centerToCornerVecX;
-        y = sprite->pos1.y + sprite->pos2.y + sprite->centerToCornerVecY;
+        x = sprite->x + sprite->x2 + sprite->centerToCornerVecX;
+        y = sprite->y + sprite->y2 + sprite->centerToCornerVecY;
     }
 
     x2 = x - (sprite->centerToCornerVecX >> 1);
@@ -9598,13 +9377,13 @@ static void DoObjectUnionRoomWarpYDisplacementUpwards(struct Sprite * sprite)
     switch (sprite->tUnionRoomWarpAnimState)
     {
     case 0:
-        sprite->pos2.y = 0;
+        sprite->y2 = 0;
         sprite->tUnionRoomWarpAnimState++;
         // fallthrough
     case 1:
-        if ((sprite->pos2.y -= 8) == -160)
+        if ((sprite->y2 -= 8) == -160)
         {
-            sprite->pos2.y = 0;
+            sprite->y2 = 0;
             sprite->tInvisible = 1;
             sprite->tUnionRoomWarpAnimNo = 0;
             sprite->tUnionRoomWarpAnimState = 0;
@@ -9618,11 +9397,11 @@ static void DoObjectUnionRoomWarpYDisplacementDownwards(struct Sprite * sprite)
     switch (sprite->tUnionRoomWarpAnimState)
     {
     case 0:
-        sprite->pos2.y = -160;
+        sprite->y2 = -160;
         sprite->tUnionRoomWarpAnimState++;
         // fallthrough
     case 1:
-        if ((sprite->pos2.y += 8) == 0)
+        if ((sprite->y2 += 8) == 0)
         {
             sprite->tUnionRoomWarpAnimNo = 0;
             sprite->tUnionRoomWarpAnimState = 0;
@@ -9684,8 +9463,8 @@ void DoShadowFieldEffect(struct ObjectEvent *objectEvent)
 static void DoRippleFieldEffect(struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
     const struct ObjectEventGraphicsInfo *graphicsInfo = GetObjectEventGraphicsInfo(objectEvent->graphicsId);
-    gFieldEffectArguments[0] = sprite->pos1.x;
-    gFieldEffectArguments[1] = sprite->pos1.y + (graphicsInfo->height >> 1) - 2;
+    gFieldEffectArguments[0] = sprite->x;
+    gFieldEffectArguments[1] = sprite->y + (graphicsInfo->height >> 1) - 2;
     gFieldEffectArguments[2] = 151;
     gFieldEffectArguments[3] = 3;
     FieldEffectStart(FLDEFF_RIPPLE);

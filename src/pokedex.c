@@ -1,7 +1,6 @@
 #include "global.h"
 #include "pokedex.h"
 #include "pokedex_screen.h"
-#include "constants/species.h"
 
 const u8 *sub_8088E20(u16 dexNum)
 {
@@ -23,7 +22,7 @@ u16 GetPokedexHeightWeight(u16 dexNum, u8 data)
 
 s8 GetSetPokedexFlag(u16 nationalDexNo, u8 caseID)
 {
-    return sub_8104AB0(nationalDexNo, caseID, 0);
+    return DexScreen_GetSetPokedexFlag(nationalDexNo, caseID, 0);
 }
 
 u16 GetNationalPokedexCount(u8 caseID)

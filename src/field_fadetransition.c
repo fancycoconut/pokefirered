@@ -207,7 +207,7 @@ static void sub_807DDF0(u8 taskId)
     switch (task->data[0])
     {
     case 0:
-        PrepareSendLinkCmd2FFE_or_RfuCmd6600();
+        SetLinkStandbyCallback();
         task->data[0]++;
         break;
     case 1:
@@ -663,7 +663,7 @@ static void Task_ReturnFromLinkRoomWarp(u8 taskId)
     case 1:
         if (!WaitWarpFadeOutScreen() && BGMusicStopped())
         {
-            Link_TryStartSend5FFF();
+            SetCloseLinkCallback();
             data[0]++;
         }
         break;
@@ -849,8 +849,8 @@ static void sub_807EAC4(s16 a0, s16 a1, s16 *a2, s16 *a3, s16 *a4)
         *a3 += a1;
     *a2 += a0;
     (*a4)++;
-    playerSpr->pos2.x = *a2 >> 5;
-    playerSpr->pos2.y = *a3 >> 5;
+    playerSpr->x2 = *a2 >> 5;
+    playerSpr->y2 = *a3 >> 5;
     if (playerObj->heldMovementFinished)
     {
         ObjectEventForceSetHeldMovement(playerObj, GetWalkInPlaceNormalMovementAction(GetPlayerFacingDirection()));
@@ -937,8 +937,8 @@ static void sub_807ECBC(s16 *a0, s16 *a1, s16 *a2, s16 *a3, s16 *a4)
     *a3 = *a1 * 16;
     *a4 = 16;
     sprite = &gSprites[gPlayerAvatar.spriteId];
-    sprite->pos2.x = *a2 >> 5;
-    sprite->pos2.y = *a3 >> 5;
+    sprite->x2 = *a2 >> 5;
+    sprite->y2 = *a3 >> 5;
     *a0 *= -1;
     *a1 *= -1;
 }
@@ -951,15 +951,15 @@ static bool8 sub_807EDA0(s16 *a0, s16 *a1, s16 *a2, s16 *a3, s16 *a4)
     {
         *a2 += *a0;
         *a3 += *a1;
-        sprite->pos2.x = *a2 >> 5;
-        sprite->pos2.y = *a3 >> 5;
+        sprite->x2 = *a2 >> 5;
+        sprite->y2 = *a3 >> 5;
         (*a4)--;
         return TRUE;
     }
     else
     {
-        sprite->pos2.x = 0;
-        sprite->pos2.y = 0;
+        sprite->x2 = 0;
+        sprite->y2 = 0;
         return FALSE;
     }
 }

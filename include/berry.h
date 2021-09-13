@@ -62,16 +62,16 @@ void ObjectEventInteractionPickBerryTree(void);
 void ObjectEventInteractionRemoveBerryTree(void);
 u8 PlayerHasBerries(void);
 void ResetBerryTreeSparkleFlags(void);
-void sub_809C794(void);
+void ClearEnigmaBerries(void);
 const struct Berry * GetBerryInfo(u8 berryIdx);
 
 extern const struct Berry gBerries[];
 
 struct BerryCrushStats {
-    u8 unk0;
+    u8 difficulty;
     u16 powder;
 };
 
-extern const struct BerryCrushStats gBerryCrushStats[];
+extern const struct BerryCrushStats gBerryCrush_BerryData[];
 
 #endif // GUARD_BERRY_H

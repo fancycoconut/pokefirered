@@ -29,6 +29,7 @@ SECTIONS {
         /* COMMON starts at 0x30022A8 */
         *(COMMON);
         end = .;
+        __end__ = .;
         . = 0x8000;
     }
 
@@ -37,8 +38,15 @@ SECTIONS {
     .text :
     ALIGN(4)
     {
-        asm/crt0.o(.text);
+        src/crt0.o(.text);
         *(.text*);
+    } =0
+
+    .text.unlikely :
+    ALIGN(4)
+    {
+        src/crt0.o(.text.unlikely);
+        *(.text.unlikely*);
     } =0
 
     script_data :

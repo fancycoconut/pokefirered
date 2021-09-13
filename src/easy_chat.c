@@ -11,8 +11,6 @@
 #include "random.h"
 #include "strings.h"
 #include "constants/easy_chat.h"
-#include "constants/flags.h"
-#include "constants/species.h"
 
 struct Unk203A120
 {
@@ -461,12 +459,17 @@ void InitEasyChatPhrases(void)
             gSaveBlock1Ptr->mail[i].words[j] = EC_WORD_UNDEFINED;
     }
 
+#ifndef UBFIX
     // BUG: This is supposed to clear 64 bits, but this loop is clearing 64 bytes.
     // However, this bug has no resulting effect on gameplay because only the
     // Mauville old man data is corrupted, which is initialized directly after
     // this function is called when starting a new game.
     for (i = 0; i < 64; i++)
         gSaveBlock1Ptr->additionalPhrases[i] = 0;
+#else
+    for (i = 0; i < NELEMS(gSaveBlock1Ptr->additionalPhrases); i++)
+        gSaveBlock1Ptr->additionalPhrases[i] = 0;
+#endif
 }
 
 void EC_ResetMEventProfileMaybe(void)
@@ -706,7 +709,7 @@ static bool8 UnlockedECMonOrMove(u16 wordIndex, u8 groupId)
 static bool32 EC_IsDeoxys(u16 species)
 {
     u32 i;
-    for (i = 0; i < ARRAY_COUNT(sDeoxysValue); i++)
+    for (i = 0; i < NELEMS(sDeoxysValue); i++)
     {
         if (sDeoxysValue[i] == species)
             return TRUE;

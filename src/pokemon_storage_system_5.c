@@ -9,7 +9,7 @@
 #include "constants/items.h"
 #include "constants/moves.h"
 
-static EWRAM_DATA struct Pokemon gUnknown_20397BC = {};
+static EWRAM_DATA struct Pokemon sMonBeingCarried = {};
 static EWRAM_DATA s8 sBoxCursorArea = 0;
 static EWRAM_DATA s8 sBoxCursorPosition = 0;
 static EWRAM_DATA bool8 sIsMonBeingMoved = FALSE;
@@ -76,7 +76,7 @@ void sub_8092340(void)
     gPSSData->inBoxMovingMode = 0;
     if (sIsMonBeingMoved)
     {
-        gPSSData->movingMon = gUnknown_20397BC;
+        gPSSData->movingMon = sMonBeingCarried;
         CreateMovingMonIcon();
     }
 }
@@ -149,35 +149,35 @@ bool8 sub_80924A8(void)
     {
         gPSSData->field_CBC += gPSSData->field_CC4;
         gPSSData->field_CC0 += gPSSData->field_CC8;
-        gPSSData->field_CB4->pos1.x = gPSSData->field_CBC >> 8;
-        gPSSData->field_CB4->pos1.y = gPSSData->field_CC0 >> 8;
-        if (gPSSData->field_CB4->pos1.x > 0x100)
+        gPSSData->field_CB4->x = gPSSData->field_CBC >> 8;
+        gPSSData->field_CB4->y = gPSSData->field_CC0 >> 8;
+        if (gPSSData->field_CB4->x > 0x100)
         {
-            tmp = gPSSData->field_CB4->pos1.x - 0x100;
-            gPSSData->field_CB4->pos1.x = tmp + 0x40;
+            tmp = gPSSData->field_CB4->x - 0x100;
+            gPSSData->field_CB4->x = tmp + 0x40;
         }
-        if (gPSSData->field_CB4->pos1.x < 0x40)
+        if (gPSSData->field_CB4->x < 0x40)
         {
-            tmp = 0x40 - gPSSData->field_CB4->pos1.x;
-            gPSSData->field_CB4->pos1.x = 0x100 - tmp;
+            tmp = 0x40 - gPSSData->field_CB4->x;
+            gPSSData->field_CB4->x = 0x100 - tmp;
         }
-        if (gPSSData->field_CB4->pos1.y > 0xb0)
+        if (gPSSData->field_CB4->y > 0xb0)
         {
-            tmp = gPSSData->field_CB4->pos1.y - 0xb0;
-            gPSSData->field_CB4->pos1.y = tmp - 0x10;
+            tmp = gPSSData->field_CB4->y - 0xb0;
+            gPSSData->field_CB4->y = tmp - 0x10;
         }
-        if (gPSSData->field_CB4->pos1.y < -0x10)
+        if (gPSSData->field_CB4->y < -0x10)
         {
-            tmp = -0x10 - gPSSData->field_CB4->pos1.y;
-            gPSSData->field_CB4->pos1.y = 0xb0 - tmp;
+            tmp = -0x10 - gPSSData->field_CB4->y;
+            gPSSData->field_CB4->y = 0xb0 - tmp;
         }
         if (gPSSData->field_CD7 && --gPSSData->field_CD7 == 0)
             gPSSData->field_CB4->vFlip = (gPSSData->field_CB4->vFlip == FALSE);
     }
     else
     {
-        gPSSData->field_CB4->pos1.x = gPSSData->field_CCC;
-        gPSSData->field_CB4->pos1.y = gPSSData->field_CCE;
+        gPSSData->field_CB4->x = gPSSData->field_CCC;
+        gPSSData->field_CB4->y = gPSSData->field_CCE;
         sub_80929B0();
     }
 
@@ -210,26 +210,26 @@ static void sub_8092660(void)
     switch (gPSSData->field_CD2)
     {
     default:
-        r7 = gPSSData->field_CCE - gPSSData->field_CB4->pos1.y;
+        r7 = gPSSData->field_CCE - gPSSData->field_CB4->y;
         break;
     case -1:
-        r7 = gPSSData->field_CCE - 0xc0 - gPSSData->field_CB4->pos1.y;
+        r7 = gPSSData->field_CCE - 0xc0 - gPSSData->field_CB4->y;
         break;
     case 1:
-        r7 = gPSSData->field_CCE + 0xc0 - gPSSData->field_CB4->pos1.y;
+        r7 = gPSSData->field_CCE + 0xc0 - gPSSData->field_CB4->y;
         break;
     }
 
     switch (gPSSData->field_CD3)
     {
     default:
-        r0 = gPSSData->field_CCC - gPSSData->field_CB4->pos1.x;
+        r0 = gPSSData->field_CCC - gPSSData->field_CB4->x;
         break;
     case -1:
-        r0 = gPSSData->field_CCC - 0xc0 - gPSSData->field_CB4->pos1.x;
+        r0 = gPSSData->field_CCC - 0xc0 - gPSSData->field_CB4->x;
         break;
     case 1:
-        r0 = gPSSData->field_CCC + 0xc0 - gPSSData->field_CB4->pos1.x;
+        r0 = gPSSData->field_CCC + 0xc0 - gPSSData->field_CB4->x;
         break;
     }
 
@@ -237,8 +237,8 @@ static void sub_8092660(void)
     r0 <<= 8;
     gPSSData->field_CC4 = r0 / gPSSData->field_CD0;
     gPSSData->field_CC8 = r7 / gPSSData->field_CD0;
-    gPSSData->field_CBC = gPSSData->field_CB4->pos1.x << 8;
-    gPSSData->field_CC0 = gPSSData->field_CB4->pos1.y << 8;
+    gPSSData->field_CBC = gPSSData->field_CB4->x << 8;
+    gPSSData->field_CC0 = gPSSData->field_CB4->y << 8;
 }
 
 static void sub_80927E8(u8 newCurosrArea, u8 newCursorPosition)
@@ -509,13 +509,13 @@ static bool8 sub_8092E10(void)
 
 static bool8 sub_8092E20(void)
 {
-    switch (gPSSData->field_CB4->pos2.y)
+    switch (gPSSData->field_CB4->y2)
     {
     default:
-        gPSSData->field_CB4->pos2.y++;
+        gPSSData->field_CB4->y2++;
         break;
     case 0:
-        gPSSData->field_CB4->pos2.y++;
+        gPSSData->field_CB4->y2++;
         break;
     case 8:
         return FALSE;
@@ -526,12 +526,12 @@ static bool8 sub_8092E20(void)
 
 static bool8 sub_8092E54(void)
 {
-    switch (gPSSData->field_CB4->pos2.y)
+    switch (gPSSData->field_CB4->y2)
     {
     case 0:
         return FALSE;
     default:
-        gPSSData->field_CB4->pos2.y--;
+        gPSSData->field_CB4->y2--;
         break;
     }
 
@@ -837,7 +837,7 @@ s8 RunCanReleaseMon(void)
 void sub_8093630(void)
 {
     if (sIsMonBeingMoved)
-        gUnknown_20397BC = gPSSData->movingMon;
+        sMonBeingCarried = gPSSData->movingMon;
 }
 
 void sub_8093660(void)
@@ -845,9 +845,9 @@ void sub_8093660(void)
     if (sIsMonBeingMoved)
     {
         if (sMovingMonOrigBoxId == TOTAL_BOXES_COUNT)
-            gPSSData->movingMon = gUnknown_20397BC;
+            gPSSData->movingMon = sMonBeingCarried;
         else
-            gPSSData->movingMon.box = gUnknown_20397BC.box;
+            gPSSData->movingMon.box = sMonBeingCarried.box;
     }
 }
 
@@ -856,24 +856,24 @@ void sub_80936B8(void)
     if (sIsMonBeingMoved)
     {
         sub_8093630();
-        gPSSData->field_218C.mon = &gUnknown_20397BC;
+        gPSSData->field_218C.mon = &sMonBeingCarried;
         gPSSData->field_2187 = 0;
         gPSSData->field_2186 = 0;
-        gPSSData->field_2188 = 0;
+        gPSSData->summaryScreenMode = PSS_MODE_NORMAL;
     }
     else if (sBoxCursorArea == CURSOR_AREA_IN_PARTY)
     {
         gPSSData->field_218C.mon = gPlayerParty;
         gPSSData->field_2187 = sBoxCursorPosition;
         gPSSData->field_2186 = CountPartyMons() - 1;
-        gPSSData->field_2188 = 0;
+        gPSSData->summaryScreenMode = PSS_MODE_NORMAL;
     }
     else
     {
         gPSSData->field_218C.box = GetBoxedMonPtr(StorageGetCurrentBox(), 0);
         gPSSData->field_2187 = sBoxCursorPosition;
         gPSSData->field_2186 = IN_BOX_COUNT - 1;
-        gPSSData->field_2188 = 5;
+        gPSSData->summaryScreenMode = PSS_MODE_BOX;
     }
 }
 
@@ -998,7 +998,7 @@ static void sub_8093A10(void)
 static void sub_8093AAC(void)
 {
     if (sIsMonBeingMoved)
-        SetCursorMonData(&gUnknown_20397BC, MODE_PARTY);
+        SetCursorMonData(&sMonBeingCarried, MODE_PARTY);
     else
         sub_8093A10();
 }
@@ -1114,18 +1114,18 @@ static void SetCursorMonData(void *pokemon, u8 mode)
             *(txtPtr)++ = CHAR_FEMALE;
             break;
         default:
-            *(txtPtr)++ = TEXT_COLOR_DARK_GREY;
+            *(txtPtr)++ = TEXT_COLOR_DARK_GRAY;
             *(txtPtr)++ = TEXT_COLOR_WHITE;
-            *(txtPtr)++ = TEXT_COLOR_LIGHT_GREY;
+            *(txtPtr)++ = TEXT_COLOR_LIGHT_GRAY;
             *(txtPtr)++ = CHAR_SPACE;
             break;
         }
 
         *(txtPtr++) = EXT_CTRL_CODE_BEGIN;
         *(txtPtr++) = EXT_CTRL_CODE_COLOR_HIGHLIGHT_SHADOW;
-        *(txtPtr++) = TEXT_COLOR_DARK_GREY;
+        *(txtPtr++) = TEXT_COLOR_DARK_GRAY;
         *(txtPtr++) = TEXT_COLOR_WHITE;
-        *(txtPtr++) = TEXT_COLOR_LIGHT_GREY;
+        *(txtPtr++) = TEXT_COLOR_LIGHT_GRAY;
         *(txtPtr++) = CHAR_SPACE;
         *(txtPtr++) = CHAR_EXTRA_EMOJI;
         *(txtPtr++) = 5; // LV_2
@@ -1862,8 +1862,8 @@ static bool8 sub_8094A0C(void)
 
 static void sub_8094AB8(struct Sprite *sprite)
 {
-    sprite->pos1.x = gPSSData->field_CB4->pos1.x;
-    sprite->pos1.y = gPSSData->field_CB4->pos1.y + 20;
+    sprite->x = gPSSData->field_CB4->x;
+    sprite->y = gPSSData->field_CB4->y + 20;
 }
 
 static void sub_8094AD8(void)

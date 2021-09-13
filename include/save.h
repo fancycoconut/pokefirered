@@ -105,15 +105,15 @@ u16 CalculateChecksum(void *data, u16 size);
 void UpdateSaveAddresses(void);
 u8 HandleSavingData(u8 saveType);
 u8 TrySavingData(u8 saveType);
-u8 sub_80DA3AC(void);
-bool8 sub_80DA3D8(void);
-u8 sub_80DA40C(void);
+u8 SaveGame_AfterLinkTrade(void);
+bool8 AfterLinkTradeSaveFailed(void);
+u8 ClearSaveAfterLinkTradeSaveFailure(void);
 u8 sub_80DA434(void);
 u8 sub_80DA45C(void);
 bool8 sub_80DA4A0(void);
 u8 Save_LoadGameData(u8 saveType);
 u32 TryCopySpecialSaveSection(u8 sector, u8* dst);
 u32 TryWriteSpecialSaveSection(u8 sector, u8* src);
-void Task_SaveGame_UpdatedLinkRecords(u8 taskId);
+void Task_LinkSave(u8 taskId);
 
 #endif // GUARD_SAVE_H

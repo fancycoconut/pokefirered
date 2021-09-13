@@ -21,7 +21,6 @@
 #include "text_window.h"
 #include "trig.h"
 #include "constants/help_system.h"
-#include "constants/flags.h"
 #include "constants/songs.h"
 #include "constants/event_objects.h"
 
@@ -497,7 +496,7 @@ static void NamingScreen_InitBGs(void)
     ChangeBgY(3, 0, 0);
 
     InitStandardTextBoxWindows();
-    ResetBg0();
+    InitTextBoxGfxAndPrinters();
 
     for (i = 0; i < NELEMS(gUnknown_83E22A0) - 1; i++)
         sNamingScreenData->windows[i] = AddWindow(&gUnknown_83E22A0[i]);
@@ -707,7 +706,7 @@ static void pokemon_transfer_to_pc_with_message(void)
     StringExpandPlaceholders(gStringVar4, sTransferredToPCMessages[stringToDisplay]);
     DrawDialogueFrame(0, FALSE);
     gTextFlags.canABSpeedUpPrint = TRUE;
-    AddTextPrinterParameterized2(0, 2, gStringVar4, GetTextSpeedSetting(), NULL, TEXT_COLOR_DARK_GREY, TEXT_COLOR_WHITE, TEXT_COLOR_LIGHT_GREY);
+    AddTextPrinterParameterized2(0, 2, gStringVar4, GetTextSpeedSetting(), NULL, TEXT_COLOR_DARK_GRAY, TEXT_COLOR_WHITE, TEXT_COLOR_LIGHT_GRAY);
     CopyWindowToVram(0, COPYWIN_BOTH);
 }
 
@@ -1016,7 +1015,7 @@ static void sub_809E7F0(struct Sprite *sprite)
         sprite->data[0] = 8;
         sprite->data[1] = (sprite->data[1] + 1) & 3;
     }
-    sprite->pos2.x = arr[sprite->data[1]];
+    sprite->x2 = arr[sprite->data[1]];
 }
 
 static void sub_809E83C(struct Sprite *sprite)
@@ -1027,13 +1026,13 @@ static void sub_809E83C(struct Sprite *sprite)
     var = GetTextCaretPosition();
     if (var != (u8)sprite->data[0])
     {
-        sprite->pos2.y = 0;
+        sprite->y2 = 0;
         sprite->data[1] = 0;
         sprite->data[2] = 0;
     }
     else
     {
-        sprite->pos2.y = arr[sprite->data[1]];
+        sprite->y2 = arr[sprite->data[1]];
         sprite->data[2]++;
         if (sprite->data[2] > 8)
         {
@@ -1068,11 +1067,11 @@ static void SetCursorPos(s16 x, s16 y)
     struct Sprite *cursorSprite = &gSprites[sNamingScreenData->cursorSpriteId];
 
     if (x < gUnknown_83E2330[sub_809DE50()])
-        cursorSprite->pos1.x = gUnknown_83E2333[sub_809DE50()][x] + 38;
+        cursorSprite->x = gUnknown_83E2333[sub_809DE50()][x] + 38;
     else
-        cursorSprite->pos1.x = 0;
+        cursorSprite->x = 0;
 
-    cursorSprite->pos1.y = y * 16 + 88;
+    cursorSprite->y = y * 16 + 88;
     cursorSprite->data[2] = cursorSprite->data[0];
     cursorSprite->data[3] = cursorSprite->data[1];
     cursorSprite->data[0] = x;
@@ -1201,11 +1200,11 @@ static bool8 PageSwapSpritesCB_SwapHide(struct Sprite *sprite)
     struct Sprite *sprite2 = &gSprites[sprite->data[7]];
     u8 page;
 
-    sprite1->pos2.y++;
-    if (sprite1->pos2.y > 7)
+    sprite1->y2++;
+    if (sprite1->y2 > 7)
     {
         sprite->data[0]++;
-        sprite1->pos2.y = -4;
+        sprite1->y2 = -4;
         sprite1->invisible = TRUE;
         page = sprite->data[1];
         sub_809ED88(sub_809DE20((page + 1) % 3), sprite1, sprite2);
@@ -1219,10 +1218,10 @@ static bool8 PageSwapSpritesCB_SwapShow(struct Sprite *sprite)
     struct Sprite *sprite2 = &gSprites[sprite->data[7]];
 
     sprite1->invisible = FALSE;
-    sprite1->pos2.y++;
-    if (sprite1->pos2.y >= 0)
+    sprite1->y2++;
+    if (sprite1->y2 >= 0)
     {
-        sprite1->pos2.y = 0;
+        sprite1->y2 = 0;
         sprite->data[0] = 1;
     }
     return FALSE;
@@ -1815,9 +1814,9 @@ struct TextColor   // Needed because of alignment
 
 static const struct TextColor sTextColorStruct = {
     {
-        {TEXT_DYNAMIC_COLOR_4, TEXT_COLOR_WHITE, TEXT_COLOR_DARK_GREY},
-        {TEXT_DYNAMIC_COLOR_5, TEXT_COLOR_WHITE, TEXT_COLOR_DARK_GREY},
-        {TEXT_DYNAMIC_COLOR_6, TEXT_COLOR_WHITE, TEXT_COLOR_DARK_GREY}
+        {TEXT_DYNAMIC_COLOR_4, TEXT_COLOR_WHITE, TEXT_COLOR_DARK_GRAY},
+        {TEXT_DYNAMIC_COLOR_5, TEXT_COLOR_WHITE, TEXT_COLOR_DARK_GRAY},
+        {TEXT_DYNAMIC_COLOR_6, TEXT_COLOR_WHITE, TEXT_COLOR_DARK_GRAY}
     }
 };
 
@@ -1881,7 +1880,7 @@ static void sub_809FA60(void)
 
 static void sub_809FAE4(void)
 {
-    const u8 color[3] = { TEXT_DYNAMIC_COLOR_6, TEXT_COLOR_WHITE, TEXT_COLOR_DARK_GREY };
+    const u8 color[3] = { TEXT_DYNAMIC_COLOR_6, TEXT_COLOR_WHITE, TEXT_COLOR_DARK_GRAY };
     int strwidth = GetStringWidth(0, gText_MoveOkBack, 0);
 
     FillWindowPixelBuffer(sNamingScreenData->windows[4], PIXEL_FILL(15));

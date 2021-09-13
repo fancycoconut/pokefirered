@@ -55,7 +55,7 @@ void sub_8149CEC(struct PokemonJump2 *arg0)
 void sub_8149D24(void)
 {
     FreeAllWindowBuffers();
-    DigitObjUtil_Teardown();
+    DigitObjUtil_Free();
 }
 
 static void sub_8149D34(struct PokemonJump2 *arg0)
@@ -667,7 +667,7 @@ static void sub_814A7D0(u16 left, u16 top, u8 cursorPos)
 
 static void sub_814A84C(void)
 {
-    u8 color[] = {TEXT_COLOR_TRANSPARENT, TEXT_COLOR_DARK_GREY, TEXT_COLOR_LIGHT_GREY};
+    u8 color[] = {TEXT_COLOR_TRANSPARENT, TEXT_COLOR_DARK_GRAY, TEXT_COLOR_LIGHT_GRAY};
 
     PutWindowTilemap(0);
     PutWindowTilemap(1);
@@ -726,7 +726,7 @@ static void sub_814A8B8(void)
 
 void sub_814A940(u32 id, s16 y)
 {
-    gUnknown_203F3D8->unk81A8[id]->pos2.y = y;
+    gUnknown_203F3D8->unk81A8[id]->y2 = y;
 }
 
 void sub_814A95C(int id)
@@ -867,7 +867,7 @@ static void sub_814AC30(bool32 arg0)
     if (!arg0)
     {
         for (i = 0; i < playersCount; i++)
-            sub_814AB98(i, TEXT_COLOR_TRANSPARENT, TEXT_COLOR_DARK_GREY, TEXT_COLOR_LIGHT_GREY);
+            sub_814AB98(i, TEXT_COLOR_TRANSPARENT, TEXT_COLOR_DARK_GRAY, TEXT_COLOR_LIGHT_GRAY);
     }
     else
     {
@@ -875,7 +875,7 @@ static void sub_814AC30(bool32 arg0)
         for (i = 0; i < playersCount; i++)
         {
             if (var != i)
-                sub_814AB98(i, TEXT_COLOR_TRANSPARENT, TEXT_COLOR_DARK_GREY, TEXT_COLOR_LIGHT_GREY);
+                sub_814AB98(i, TEXT_COLOR_TRANSPARENT, TEXT_COLOR_DARK_GRAY, TEXT_COLOR_LIGHT_GRAY);
             else
                 sub_814AB98(i, TEXT_COLOR_TRANSPARENT, TEXT_COLOR_RED, TEXT_COLOR_LIGHT_RED);
         }

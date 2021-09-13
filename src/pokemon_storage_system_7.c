@@ -4,7 +4,6 @@
 #include "pokemon_icon.h"
 #include "pokemon_storage_system_internal.h"
 #include "text_window.h"
-#include "constants/species.h"
 
 struct MoveMons
 {
@@ -474,8 +473,13 @@ static void sub_80957C8(void)
         for (j = sMoveMonsPtr->minRow; j < rowCount; j++)
         {
             struct BoxPokemon *boxMon = GetBoxedMonPtr(boxId, boxPosition);
-
+            // UB: possible null dereference
+#ifdef UBFIX
+            if (boxMon != NULL)
+                sMoveMonsPtr->boxMons[monArrayId] = *boxMon;
+#else
             sMoveMonsPtr->boxMons[monArrayId] = *boxMon;
+#endif
             monArrayId++;
             boxPosition++;
         }

@@ -5,7 +5,6 @@
 #include "item.h"
 #include "random.h"
 #include "battle_ai_script_commands.h"
-#include "constants/species.h"
 #include "constants/abilities.h"
 #include "constants/battle_ai.h"
 #include "constants/battle_move_effects.h"
@@ -1363,7 +1362,12 @@ static void Cmd_if_status_not_in_party(void)
 
         // everytime the status is found, the AI's logic jumps further and further past its intended destination. this results in a broken AI macro and is probably why it is unused.
         if (species != SPECIES_NONE && species != SPECIES_EGG && hp != 0 && status == statusToCompareTo)
+        {
             sAIScriptPtr += 10; // doesnt return?
+            #ifdef UBFIX
+            return;
+            #endif
+        }
     }
     sAIScriptPtr = T1_READ_PTR(sAIScriptPtr + 6);
 }

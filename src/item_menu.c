@@ -85,7 +85,7 @@ static bool8 TryAllocListMenuBuffers(void);
 static void Bag_BuildListMenuTemplate(u8 pocket);
 static void BagListMenuGetItemNameColored(u8 *dest, u16 itemId);
 static void BagListMenuMoveCursorFunc(s32 itemIndex, bool8 onInit, struct ListMenu *list);
-static void BagListMenuItemPrintFunc(u8 windowId, s32 itemId, u8 y);
+static void BagListMenuItemPrintFunc(u8 windowId, u32 itemId, u8 y);
 static void bag_menu_print_cursor(u8 y, u8 colorIdx);
 static void PrintBagPocketName(void);
 static void PrintItemDescriptionOnMessageWindow(s32 itemIndex);
@@ -289,9 +289,9 @@ static const struct YesNoFuncTable sYesNoMenu_Sell = {
     Task_SellItem_No
 };
 
-static const u8 sListItemTextColor_RegularItem[] = _("{COLOR_HIGHLIGHT_SHADOW RED TRANSPARENT GREEN}");
+static const u8 sListItemTextColor_RegularItem[] = _("{COLOR_HIGHLIGHT_SHADOW DARK_GRAY TRANSPARENT LIGHT_GRAY}");
 
-static const u8 sListItemTextColor_TmCase_BerryPouch[] = _("{COLOR_HIGHLIGHT_SHADOW LIGHT_GRAY TRANSPARENT BLACK}");
+static const u8 sListItemTextColor_TmCase_BerryPouch[] = _("{COLOR_HIGHLIGHT_SHADOW BLUE TRANSPARENT LIGHT_BLUE}");
 
 static const struct ScrollArrowsTemplate sPocketSwitchArrowPairTemplate = {
     .firstArrowType = SCROLL_ARROW_LEFT,
@@ -699,7 +699,7 @@ static void BagListMenuMoveCursorFunc(s32 itemIndex, bool8 onInit, struct ListMe
     }
 }
 
-static void BagListMenuItemPrintFunc(u8 windowId, s32 itemId, u8 y)
+static void BagListMenuItemPrintFunc(u8 windowId, u32 itemId, u8 y)
 {
     u16 bagItemId;
     u16 bagItemQuantity;
@@ -1224,7 +1224,7 @@ static void BeginMovingItemInPocket(u8 taskId, s16 itemIndex)
     u16 cursorPos;
     s16 *data = gTasks[taskId].data;
     ListMenuGetScrollAndRow(data[0], &cursorPos, &itemsAbove);
-    ListMenuSetUnkIndicatorsStructField(data[0], 0x10, 1);
+    ListMenuSetTemplateField(data[0], LISTFIELD_CURSORKIND, 1);
     data[1] = itemIndex;
     sBagMenuDisplay->itemOriginalLocation = itemIndex;
     StringCopy(gStringVar1, ItemId_GetName(BagGetItemIdByPocketPosition(gBagMenuState.pocket + 1, data[1])));
@@ -2351,7 +2351,7 @@ static void Task_Bag_TeachyTvStatus(u8 taskId)
             DestroyListMenuTask(data[0], NULL, NULL);
             RestorePlayerBag();
             gItemUseCB = ItemUseCB_MedicineStep;
-            ItemMenu_SetExitCallback(ChooseMonForInBattleItem);
+            ItemMenu_SetExitCallback(Pokedude_ChooseMonForInBattleItem);
             gTasks[taskId].func = Task_Pokedude_FadeFromBag;
             return;
         }

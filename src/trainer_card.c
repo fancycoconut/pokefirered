@@ -18,7 +18,7 @@
 #include "new_menu_helpers.h"
 #include "constants/songs.h"
 #include "constants/game_stat.h"
-#include "constants/facility_trainer_classes.h"
+#include "constants/trainers.h"
 
 // Trainer Card Strings
 enum
@@ -74,7 +74,7 @@ struct TrainerCardData
     u16 cardTiles[0x1180];
     u16 cardTilemapBuffer[0x1000];
     u16 bgTilemapBuffer[0x1000];
-    u16 var_7BCC;
+    u16 cardTop;
     bool8 timeColonNeedDraw;
     u8 language;
 }; /* size = 0x7BD0 */
@@ -96,7 +96,7 @@ static u8 GetTrainerStarCount(struct TrainerCard *trainerCard);
 static void SetPlayerCardData(struct TrainerCard *trainerCard, u8 cardType);
 static void SetDataFromTrainerCard(void);
 static void HandleGpuRegs(void);
-static void sub_8089BD8(u16 arg0);
+static void UpdateCardFlipRegs(u16 cardTop);
 static void ResetGpuRegs(void);
 static void TrainerCardNull(void);
 static void sub_8089C5C(void);
@@ -308,25 +308,25 @@ static const u8 sLinkTrainerPicFacilityClasses[GENDER_COUNT][NUM_LINK_TRAINER_CA
 {
     [MALE] = 
     {
-        FACILITY_CLASS_COOLTRAINER_3, 
-        FACILITY_CLASS_BLACK_BELT_2, 
-        FACILITY_CLASS_CAMPER_2, 
-        FACILITY_CLASS_YOUNGSTER_2, 
-        FACILITY_CLASS_PSYCHIC_3, 
-        FACILITY_CLASS_BUG_CATCHER_2, 
+        FACILITY_CLASS_COOLTRAINER_M, 
+        FACILITY_CLASS_BLACK_BELT, 
+        FACILITY_CLASS_CAMPER, 
+        FACILITY_CLASS_YOUNGSTER, 
+        FACILITY_CLASS_PSYCHIC_M, 
+        FACILITY_CLASS_BUG_CATCHER, 
         FACILITY_CLASS_TAMER, 
         FACILITY_CLASS_JUGGLER
     },
     [FEMALE] = 
     {
-        FACILITY_CLASS_COOLTRAINER_4,
+        FACILITY_CLASS_COOLTRAINER_F,
         FACILITY_CLASS_CHANNELER, 
-        FACILITY_CLASS_PICNICKER_2, 
-        FACILITY_CLASS_LASS_2, 
-        FACILITY_CLASS_PSYCHIC_2, 
+        FACILITY_CLASS_PICNICKER, 
+        FACILITY_CLASS_LASS, 
+        FACILITY_CLASS_RS_PSYCHIC_F, 
         FACILITY_CLASS_BATTLE_GIRL, 
-        FACILITY_CLASS_PKMN_BREEDER_2, 
-        FACILITY_CLASS_BEAUTY_2
+        FACILITY_CLASS_RS_PKMN_BREEDER_F, 
+        FACILITY_CLASS_BEAUTY
     }
 };
 
@@ -961,16 +961,16 @@ static void HandleGpuRegs(void)
 }
 
 // Part of animating card flip
-static void sub_8089BD8(u16 arg0)
+static void UpdateCardFlipRegs(u16 cardTop)
 {
-    s8 quotient = (arg0 + 40) / 10;
+    s8 blendY = (cardTop + 40) / 10;
 
-    if (quotient <= 4)
-        quotient = 0;
+    if (blendY <= 4)
+        blendY = 0;
 
-    sTrainerCardDataPtr->flipBlendY = quotient;
+    sTrainerCardDataPtr->flipBlendY = blendY;
     SetGpuReg(REG_OFFSET_BLDY, sTrainerCardDataPtr->flipBlendY);
-    SetGpuReg(REG_OFFSET_WIN0V, WIN_RANGE(sTrainerCardDataPtr->var_7BCC, 160 - sTrainerCardDataPtr->var_7BCC));
+    SetGpuReg(REG_OFFSET_WIN0V, WIN_RANGE(sTrainerCardDataPtr->cardTop, 160 - sTrainerCardDataPtr->cardTop));
 }
 
 static void ResetGpuRegs(void)
@@ -1673,8 +1673,8 @@ static bool8 Task_AnimateCardFlipDown(struct Task* task)
     else
         task->data[1] += 7;
 
-    sTrainerCardDataPtr->var_7BCC = task->data[1];
-    sub_8089BD8(task->data[1]);
+    sTrainerCardDataPtr->cardTop = task->data[1];
+    UpdateCardFlipRegs(task->data[1]);
 
     r7 = task->data[1];
     r9 = 160 - r7;
@@ -1799,8 +1799,8 @@ static bool8 Task_AnimateCardFlipUp(struct Task* task)
     else
         task->data[1] -= 5;
 
-    sTrainerCardDataPtr->var_7BCC = task->data[1];
-    sub_8089BD8(task->data[1]);
+    sTrainerCardDataPtr->cardTop = task->data[1];
+    UpdateCardFlipRegs(task->data[1]);
 
     r7 = task->data[1];
     r9 = 160 - r7;

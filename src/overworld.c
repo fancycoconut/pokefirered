@@ -148,7 +148,7 @@ static void MoveSaveBlocks_ResetHeap_(void);
 static void sub_8056E80(void);
 static void sub_8056F08(void);
 static void InitOverworldGraphicsRegisters(void);
-static void sub_8057024(bool32 a0);
+static void ResumeMap(bool32 a0);
 static void sub_8057074(void);
 static void mli4_mapscripts_and_other(void);
 static void ReloadObjectsAndRunReturnToFieldMapScript(void);
@@ -1346,7 +1346,7 @@ static void InitOverworldBgs(void)
     SetBgTilemapBuffer(3, gBGTilemapBuffers3);
     InitStandardTextBoxWindows();
     InitTextBoxGfxAndPrinters();
-    sub_8069348();
+    InitFieldMessageBox();
 }
 
 static void InitOverworldBgs_NoResetHeap(void)
@@ -1364,7 +1364,7 @@ static void InitOverworldBgs_NoResetHeap(void)
     SetBgTilemapBuffer(3, gBGTilemapBuffers3);
     InitStandardTextBoxWindows();
     InitTextBoxGfxAndPrinters();
-    sub_8069348();
+    InitFieldMessageBox();
 }
 
 void CleanupOverworldWindowsAndTilemaps(void)
@@ -1675,7 +1675,7 @@ void CB2_ReturnToFieldFromDiploma(void)
 
 static void FieldCB_ShowMapNameOnContinue(void)
 {
-    if (SHOW_MAP_NAME_ENABLED)
+    if (gMapHeader.showMapName == TRUE)
         ShowMapNamePopup(FALSE);
     FieldCB_WarpExitFadeFromBlack();
 }
@@ -1775,7 +1775,7 @@ static bool32 map_loading_iteration_3(u8 *state)
         (*state)++;
         break;
     case 2:
-        sub_8057024(TRUE);
+        ResumeMap(TRUE);
         (*state)++;
         break;
     case 3:
@@ -1852,7 +1852,7 @@ static bool32 load_map_stuff(u8 *state, bool32 a1)
         (*state)++;
         break;
     case 2:
-        sub_8057024(a1);
+        ResumeMap(a1);
         (*state)++;
         break;
     case 3:
@@ -1909,7 +1909,7 @@ static bool32 load_map_stuff(u8 *state, bool32 a1)
             MapPreview_LoadGfx(gMapHeader.regionMapSectionId);
             MapPreview_StartForestTransition(gMapHeader.regionMapSectionId);
         }
-        else if (SHOW_MAP_NAME_ENABLED)
+        else if (gMapHeader.showMapName == TRUE)
         {
             ShowMapNamePopup(FALSE);
         }
@@ -1932,7 +1932,7 @@ static bool32 sub_8056CD8(u8 *state)
     case 0:
         InitOverworldBgs();
         QuestLog_InitPalettesBackup();
-        sub_8057024(FALSE);
+        ResumeMap(FALSE);
         ReloadObjectsAndRunReturnToFieldMapScript();
         sub_8057114();
         (*state)++;
@@ -1966,7 +1966,7 @@ static bool32 map_loading_iteration_2_link(u8 *state)
         break;
     case 1:
         QuestLog_InitPalettesBackup();
-        sub_8057024(1);
+        ResumeMap(1);
         (*state)++;
         break;
     case 2:
@@ -2093,7 +2093,7 @@ static void InitOverworldGraphicsRegisters(void)
     ChangeBgY(3, 0, 0);
 }
 
-static void sub_8057024(u32 a1)
+static void ResumeMap(u32 a1)
 {
     ResetTasks();
     ResetSpriteData();
@@ -2263,7 +2263,7 @@ static bool32 LoadMap_QLPlayback(u8 *state)
         (*state)++;
         break;
     case 2:
-        sub_8057024(0);
+        ResumeMap(0);
         (*state)++;
         break;
     case 3:
@@ -2349,7 +2349,7 @@ void Overworld_CreditsMainCB(void)
         SetVBlankCallback(NULL);
     RunTasks();
     AnimateSprites();
-    sub_805ACF0();
+    CameraUpdateNoObjectRefresh();
     UpdateCameraPanning();
     BuildOamBuffer();
     UpdatePaletteFade();

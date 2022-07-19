@@ -219,7 +219,7 @@ static void Task_Linkup1(u8 taskId)
 
 static void Task_LinkupMaster_2(u8 taskId)
 {
-    if (sub_80808F0(taskId) != TRUE && sub_8080990(taskId) != TRUE && sub_80808BC(taskId) != TRUE && !textbox_any_visible())
+    if (sub_80808F0(taskId) != TRUE && sub_8080990(taskId) != TRUE && sub_80808BC(taskId) != TRUE && !GetFieldMessageBoxType())
     {
         gTasks[taskId].data[3] = 0;
         gTasks[taskId].func = Task_LinkupMaster_3;
@@ -246,7 +246,7 @@ static void Task_LinkupMaster_3(u8 taskId)
 
 static void Task_LinkupMaster_4(u8 taskId)
 {
-    if (sub_80808F0(taskId) != TRUE && sub_8080990(taskId) != TRUE && sub_80808BC(taskId) != TRUE && !textbox_any_visible())
+    if (sub_80808F0(taskId) != TRUE && sub_8080990(taskId) != TRUE && sub_80808BC(taskId) != TRUE && !GetFieldMessageBoxType())
     {
         if (GetSavedPlayerCount() != GetLinkPlayerCount_2())
         {
@@ -782,20 +782,20 @@ static void Task_EnterCableClubSeat(u8 taskId)
     case 1:
         if (IsFieldMessageBoxHidden())
         {
-            sub_8057F34();
+            SetInCableClubSeat();
             SetLocalLinkPlayerId(gSpecialVar_0x8005);
             task->data[0] = 2;
         }
         break;
     case 2:
-        switch (sub_8057EC0())
+        switch (GetCableClubPartnersReady())
         {
         case 0:
             break;
         case 1:
             HideFieldMessageBox();
             task->data[0] = 0;
-            sub_8057F70();
+            SetStartedCableClubActivity();
             SwitchTaskToFollowupFunc(taskId);
             break;
         case 2:
@@ -804,7 +804,7 @@ static void Task_EnterCableClubSeat(u8 taskId)
         }
         break;
     case 3:
-        sub_8057F48();
+        SetLinkWaitingForScript();
         sub_80F771C(TRUE);
         DestroyTask(taskId);
         EnableBothScriptContexts();

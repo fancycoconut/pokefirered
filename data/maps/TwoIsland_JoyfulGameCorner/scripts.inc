@@ -37,13 +37,13 @@ TwoIsland_JoyfulGameCorner_OnFrame::
 
 TwoIsland_JoyfulGameCorner_EventScript_FoundLostelleScene::
 	lockall
-	textcolor 0
+	textcolor NPC_TEXT_COLOR_MALE
 	msgbox TwoIsland_JoyfulGameCorner_Text_YouRescuedLostelle
-	textcolor 1
+	textcolor NPC_TEXT_COLOR_FEMALE
 	special BufferBigGuyOrBigGirlString
 	msgbox TwoIsland_JoyfulGameCorner_Text_LostelleItsOkayDaddy
 	closemessage
-	applymovement LOCALID_LOSTELLE, Movement_WalkInPlaceFastestDown
+	applymovement LOCALID_LOSTELLE, Common_Movement_WalkInPlaceFasterDown
 	waitmovement 0
 	setvar VAR_MAP_SCENE_TWO_ISLAND_JOYFUL_GAME_CORNER, 3
 	releaseall
@@ -51,39 +51,39 @@ TwoIsland_JoyfulGameCorner_EventScript_FoundLostelleScene::
 
 TwoIsland_JoyfulGameCorner_EventScript_HelpFindLostelleScene::
 	lockall
-	textcolor 0
-	applymovement LOCALID_DADDY, Movement_171520
+	textcolor NPC_TEXT_COLOR_MALE
+	applymovement LOCALID_DADDY, TwoIsland_JoyfulGameCorner_Movement_DaddyPacing
 	waitmovement 0
 	msgbox TwoIsland_JoyfulGameCorner_Text_WhereHasLostelleGottenTo
 	closemessage
-	applymovement LOCALID_DADDY, Movement_WalkInPlaceFastestDown
+	applymovement LOCALID_DADDY, Common_Movement_WalkInPlaceFasterDown
 	waitmovement 0
 	playse SE_PIN
-	applymovement LOCALID_DADDY, Movement_ExclamationMark
+	applymovement LOCALID_DADDY, Common_Movement_ExclamationMark
 	waitmovement 0
-	applymovement LOCALID_DADDY, Movement_Delay48
+	applymovement LOCALID_DADDY, Common_Movement_Delay48
 	waitmovement 0
-	applymovement LOCALID_DADDY, Movement_171527
+	applymovement LOCALID_DADDY, TwoIsland_JoyfulGameCorner_Movement_DaddyApproachPlayer
 	waitmovement 0
-	applymovement OBJ_EVENT_ID_PLAYER, Movement_WalkInPlaceFastestRight
+	applymovement OBJ_EVENT_ID_PLAYER, Common_Movement_WalkInPlaceFasterRight
 	waitmovement 0
 	msgbox TwoIsland_JoyfulGameCorner_Text_PleaseHelpFindLostelle
 	closemessage
 	playse SE_RS_DOOR
 	waitse
-	applymovement OBJ_EVENT_ID_PLAYER, Movement_17152C
+	applymovement OBJ_EVENT_ID_PLAYER, TwoIsland_JoyfulGameCorner_Movement_PlayerFaceDaddy
 	waitmovement 0
 	playbgm MUS_ENCOUNTER_BOY, 0
 	addobject LOCALID_BIKER
 	applymovement LOCALID_BIKER, TwoIsland_JoyfulGameCorner_Movement_BikerLookAround
 	waitmovement 0
 	msgbox TwoIsland_JoyfulGameCorner_Text_IsThisOnlyThreeIsland
-	applymovement LOCALID_BIKER, Movement_WalkInPlaceFastestRight
+	applymovement LOCALID_BIKER, Common_Movement_WalkInPlaceFasterRight
 	waitmovement 0
 	msgbox TwoIsland_JoyfulGameCorner_Text_ThisIsTwoIslandMoveIt
 	msgbox TwoIsland_JoyfulGameCorner_Text_TheseIslandsAreConfusing
 	closemessage
-	applymovement LOCALID_BIKER, Movement_WalkInPlaceFastestDown
+	applymovement LOCALID_BIKER, Common_Movement_WalkInPlaceFasterDown
 	waitmovement 0
 	playse SE_EXIT
 	removeobject LOCALID_BIKER
@@ -96,40 +96,39 @@ TwoIsland_JoyfulGameCorner_EventScript_HelpFindLostelleScene::
 	releaseall
 	end
 
-Movement_171520::
+TwoIsland_JoyfulGameCorner_Movement_DaddyPacing::
 	walk_left
 	walk_right
 	walk_right
 	delay_8
-	walk_in_place_fastest_up
+	walk_in_place_faster_up
 	delay_16
 	step_end
 
-Movement_171527::
+TwoIsland_JoyfulGameCorner_Movement_DaddyApproachPlayer::
 	walk_down
 	walk_down
 	walk_down
-	walk_in_place_fastest_left
+	walk_in_place_faster_left
 	step_end
 
-Movement_17152C::
+TwoIsland_JoyfulGameCorner_Movement_PlayerFaceDaddy::
 	walk_left
-	walk_in_place_fastest_right
+	walk_in_place_faster_right
 	step_end
 
 TwoIsland_JoyfulGameCorner_Movement_BikerLookAround::
-	walk_in_place_fastest_left
+	walk_in_place_faster_left
 	delay_8
-	walk_in_place_fastest_right
+	walk_in_place_faster_right
 	delay_8
-	walk_in_place_fastest_up
+	walk_in_place_faster_up
 	step_end
 
 TwoIsland_JoyfulGameCorner_EventScript_InfoMan::
 	lock
 	faceplayer
-	compare VAR_MAP_SCENE_TWO_ISLAND_JOYFUL_GAME_CORNER, 4
-	goto_if_eq JoyfulGameCorner_EventScript_InfoMan2
+	goto_if_eq VAR_MAP_SCENE_TWO_ISLAND_JOYFUL_GAME_CORNER, 4, JoyfulGameCorner_EventScript_InfoMan2
 	goto_if_set FLAG_RESCUED_LOSTELLE, TwoIsland_JoyfulGameCorner_EventScript_GetGamesGoingSoon
 	msgbox TwoIsland_JoyfulGameCorner_Text_NotRunningAnyGamesToday
 	release
@@ -144,11 +143,9 @@ TwoIsland_JoyfulGameCorner_EventScript_GetGamesGoingSoon::
 TwoIsland_JoyfulGameCorner_EventScript_LostellesDaddy::
 	lock
 	faceplayer
-	compare VAR_MAP_SCENE_TWO_ISLAND_JOYFUL_GAME_CORNER, 4
-	goto_if_eq JoyfulGameCorner_EventScript_MinigameAttendant
+	goto_if_eq VAR_MAP_SCENE_TWO_ISLAND_JOYFUL_GAME_CORNER, 4, JoyfulGameCorner_EventScript_MinigameAttendant
 	goto_if_set FLAG_GOT_MOON_STONE_FROM_JOYFUL_GAME_CORNER, TwoIsland_JoyfulGameCorner_EventScript_GetGameCornerRunning
-	compare VAR_MAP_SCENE_TWO_ISLAND_JOYFUL_GAME_CORNER, 3
-	goto_if_eq TwoIsland_JoyfulGameCorner_EventScript_GiveDaddyMeteorite
+	goto_if_eq VAR_MAP_SCENE_TWO_ISLAND_JOYFUL_GAME_CORNER, 3, TwoIsland_JoyfulGameCorner_EventScript_GiveDaddyMeteorite
 	msgbox TwoIsland_JoyfulGameCorner_Text_PleaseGoToThreeIsland
 	release
 	end
@@ -157,21 +154,20 @@ TwoIsland_JoyfulGameCorner_EventScript_GiveDaddyMeteorite::
 	goto_if_set FLAG_NO_ROOM_FOR_JOYFUL_GAME_CORNER_MOON_STONE, TwoIsland_JoyfulGameCorner_EventScript_ReceiveMoonStone
 	msgbox TwoIsland_JoyfulGameCorner_Text_ThisIsForMe
 	setvar VAR_MAP_SCENE_ONE_ISLAND_POKEMON_CENTER_1F, 2
-	textcolor 3
+	textcolor NPC_TEXT_COLOR_NEUTRAL
 	playfanfare MUS_OBTAIN_TMHM
 	message TwoIsland_JoyfulGameCorner_Text_HandedMeteoriteToLostellesDaddy
 	waitmessage
 	waitfanfare
 	call EventScript_RestorePrevTextColor
-	removeitem ITEM_METEORITE, 1
+	removeitem ITEM_METEORITE
 	msgbox TwoIsland_JoyfulGameCorner_Text_OhThisIsFromBill
 	goto TwoIsland_JoyfulGameCorner_EventScript_ReceiveMoonStone
 	end
 
 TwoIsland_JoyfulGameCorner_EventScript_ReceiveMoonStone::
-	checkitemspace ITEM_MOON_STONE, 1
-	compare VAR_RESULT, FALSE
-	goto_if_eq TwoIsland_JoyfulGameCorner_EventScript_NoRoomForMoonStone
+	checkitemspace ITEM_MOON_STONE
+	goto_if_eq VAR_RESULT, FALSE, TwoIsland_JoyfulGameCorner_EventScript_NoRoomForMoonStone
 	additem ITEM_MOON_STONE
 	setflag FLAG_GOT_MOON_STONE_FROM_JOYFUL_GAME_CORNER
 	msgreceiveditem TwoIsland_JoyfulGameCorner_Text_ReceivedMoonStoneFromLostellesDaddy, ITEM_MOON_STONE

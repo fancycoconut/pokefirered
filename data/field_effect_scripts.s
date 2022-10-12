@@ -21,10 +21,10 @@ gFieldEffectScriptPointers::
 	.4byte gFldEffScript_JumpSmallSplash         @ FLDEFF_JUMP_SMALL_SPLASH
 	.4byte gFldEffScript_LongGrass               @ FLDEFF_LONG_GRASS
 	.4byte gFldEffScript_JumpLongGrass           @ FLDEFF_JUMP_LONG_GRASS
-	.4byte gFldEffScript_Unknown19               @ FLDEFF_UNKNOWN_19
-	.4byte gFldEffScript_Unknown20               @ FLDEFF_UNKNOWN_20
-	.4byte gFldEffScript_Unknown21               @ FLDEFF_UNKNOWN_21
-	.4byte gFldEffScript_Unknown22               @ FLDEFF_UNKNOWN_22
+	.4byte gFldEffScript_UnusedGrass             @ FLDEFF_UNUSED_GRASS
+	.4byte gFldEffScript_UnusedGrass2            @ FLDEFF_UNUSED_GRASS_2
+	.4byte gFldEffScript_UnusedSand              @ FLDEFF_UNUSED_SAND
+	.4byte gFldEffScript_UnusedWaterSurfacing    @ FLDEFF_UNUSED_WATER_SURFACING
 	.4byte gFldEffScript_BerryTreeGrowthSparkle  @ FLDEFF_BERRY_TREE_GROWTH_SPARKLE
 	.4byte gFldEffScript_DeepSandFootprints      @ FLDEFF_DEEP_SAND_FOOTPRINTS
 	.4byte gFldEffScript_PokecenterHeal          @ FLDEFF_POKECENTER_HEAL
@@ -48,7 +48,7 @@ gFieldEffectScriptPointers::
 	.4byte gFldEffScript_UseWaterfall            @ FLDEFF_USE_WATERFALL
 	.4byte gFldEffScript_UseDive                 @ FLDEFF_USE_DIVE
 	.4byte gFldEffScript_Pokeball                @ FLDEFF_POKEBALL
-	.4byte gFldEffScript_HeartIcon               @ FLDEFF_X_ICON
+	.4byte gFldEffScript_XIcon                   @ FLDEFF_X_ICON
 	.4byte gFldEffScript_Nop47                   @ FLDEFF_NOP_47
 	.4byte gFldEffScript_Nop48                   @ FLDEFF_NOP_48
 	.4byte gFldEffScript_PopOutOfAsh             @ FLDEFF_POP_OUT_OF_ASH
@@ -148,20 +148,20 @@ gFldEffScript_JumpLongGrass::
 	loadfadedpal_callnative gSpritePalette_GeneralFieldEffect1, FldEff_JumpLongGrass
 	end 
 
-gFldEffScript_Unknown19::
-	loadfadedpal_callnative gSpritePalette_GeneralFieldEffect1, FldEff_Unknown19
+gFldEffScript_UnusedGrass::
+	loadfadedpal_callnative gSpritePalette_GeneralFieldEffect1, FldEff_UnusedGrass
 	end 
 
-gFldEffScript_Unknown20::
-	loadfadedpal_callnative gSpritePalette_GeneralFieldEffect1, FldEff_Unknown20
+gFldEffScript_UnusedGrass2::
+	loadfadedpal_callnative gSpritePalette_GeneralFieldEffect1, FldEff_UnusedGrass2
 	end 
 
-gFldEffScript_Unknown21::
-	loadfadedpal_callnative gSpritePalette_GeneralFieldEffect0, FldEff_Unknown21
+gFldEffScript_UnusedSand::
+	loadfadedpal_callnative gSpritePalette_GeneralFieldEffect0, FldEff_UnusedSand
 	end 
 
-gFldEffScript_Unknown22::
-	loadfadedpal_callnative gSpritePalette_GeneralFieldEffect0, FldEff_Unknown22
+gFldEffScript_UnusedWaterSurfacing::
+	loadfadedpal_callnative gSpritePalette_GeneralFieldEffect0, FldEff_UnusedWaterSurfacing
 	end 
 
 gFldEffScript_BerryTreeGrowthSparkle::
@@ -256,7 +256,7 @@ gFldEffScript_Pokeball::
 	callnative FldEff_Pokeball
 	end 
 
-gFldEffScript_HeartIcon::
+gFldEffScript_XIcon::
 	callnative FldEff_XIcon
 	end 
 

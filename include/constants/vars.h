@@ -230,13 +230,13 @@
 #define VAR_0x40B3                 0x40B3
 #define VAR_PORTHOLE               0x40B4
 #define VAR_EVENT_PICHU_SLOT       0x40B5
-#define VAR_0x40B6                 0x40B6
-#define VAR_0x40B7                 0x40B7
-#define VAR_0x40B8                 0x40B8
-#define VAR_0x40B9                 0x40B9
-#define VAR_0x40BA                 0x40BA
-#define VAR_0x40BB                 0x40BB
-#define VAR_0x40BC                 0x40BC
+#define VAR_MYSTERY_GIFT_1         0x40B6
+#define VAR_MYSTERY_GIFT_2         0x40B7
+#define VAR_MYSTERY_GIFT_3         0x40B8
+#define VAR_MYSTERY_GIFT_4         0x40B9
+#define VAR_MYSTERY_GIFT_5         0x40BA
+#define VAR_MYSTERY_GIFT_6         0x40BB
+#define VAR_MYSTERY_GIFT_7         0x40BC
 #define VAR_0x40BD                 0x40BD
 #define VAR_0x40BE                 0x40BE
 #define VAR_0x40BF                 0x40BF
@@ -333,5 +333,12 @@
 #define VAR_0x8014                 0x8014 // Unknown/unused
 
 #define SPECIAL_VARS_END           0x8014
+
+// Text color ids for VAR_TEXT_COLOR / VAR_PREV_TEXT_COLOR
+#define NPC_TEXT_COLOR_MALE      0 // Blue, for male NPCs
+#define NPC_TEXT_COLOR_FEMALE    1 // Red, for female NPCs
+#define NPC_TEXT_COLOR_MON       2 // Black, for Pokémon
+#define NPC_TEXT_COLOR_NEUTRAL   3 // Black, for inanimate objects and messages from the game
+#define NPC_TEXT_COLOR_DEFAULT 255 // If an NPC is selected, use the color specified by GetColorFromTextColorTable, otherwise use Neutral.
 
 #endif // GUARD_CONSTANTS_VARS_H

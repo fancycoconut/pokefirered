@@ -34,6 +34,7 @@
 #include "constants/trainers.h"
 #include "constants/hold_effects.h"
 #include "constants/battle_move_effects.h"
+#include "constants/union_room.h"
 
 #define SPECIES_TO_HOENN(name)      [SPECIES_##name - 1] = HOENN_DEX_##name
 #define SPECIES_TO_NATIONAL(name)   [SPECIES_##name - 1] = NATIONAL_DEX_##name
@@ -93,6 +94,9 @@ static const struct CombinedMove sCombinedMoves[2] =
     {MOVE_EMBER, MOVE_GUST, MOVE_HEAT_WAVE},
     {0xFFFF, 0xFFFF, 0xFFFF}
 };
+
+// NOTE: The order of the elements in the 3 arrays below is irrelevant.
+// To reorder the pokedex, see the values in include/constants/pokedex.h.
 
 static const u16 sSpeciesToHoennPokedexNum[] = // Assigns all species to the Hoenn Dex Index (Summary No. for Hoenn Dex)
 {
@@ -1640,7 +1644,9 @@ static const u16 sDeoxysBaseStats[] =
 };
 #endif
 
-const u16 gLinkPlayerFacilityClasses[] = 
+// The classes used by other players in the Union Room.
+// These should correspond with the overworld graphics in sUnionRoomObjGfxIds
+const u16 gUnionRoomFacilityClasses[NUM_UNION_ROOM_CLASSES * GENDER_COUNT] = 
 {
     // Male
     FACILITY_CLASS_COOLTRAINER_M,
@@ -5008,7 +5014,7 @@ u16 GetEvolutionTargetSpecies(struct Pokemon *mon, u8 type, u16 evolutionItem)
                 if (gEvolutionTable[species][i].param == heldItem)
                 {
                     targetSpecies = gEvolutionTable[species][i].targetSpecies;
-                    if (IsNationalPokedexEnabled() || targetSpecies <= 151)
+                    if (IsNationalPokedexEnabled() || targetSpecies <= KANTO_SPECIES_END)
                     {
                         heldItem = 0;
                         SetMonData(mon, MON_DATA_HELD_ITEM, &heldItem);
@@ -5664,7 +5670,7 @@ u16 SpeciesToPokedexNum(u16 species)
 {
     species = SpeciesToNationalPokedexNum(species);
 
-    if (!IsNationalPokedexEnabled() && species > 151)
+    if (!IsNationalPokedexEnabled() && species > KANTO_SPECIES_END)
         return 0xFFFF;
     return species;
 }
@@ -5774,7 +5780,7 @@ bool32 IsHMMove2(u16 move)
     return FALSE;
 }
 
-bool8 IsPokeSpriteNotFlipped(u16 species)
+bool8 IsMonSpriteNotFlipped(u16 species)
 {
     return gBaseStats[species].noFlip;
 }
@@ -6028,19 +6034,19 @@ void SetDeoxysStats(void)
 u16 GetUnionRoomTrainerPic(void)
 {
     u8 linkId = GetMultiplayerId() ^ 1;
-    u32 arrId = gLinkPlayers[linkId].trainerId & 7;
 
-    arrId |= gLinkPlayers[linkId].gender << 3;
-    return FacilityClassToPicIndex(gLinkPlayerFacilityClasses[arrId]);
+    u32 arrId = gLinkPlayers[linkId].trainerId % NUM_UNION_ROOM_CLASSES;
+    arrId |= gLinkPlayers[linkId].gender * NUM_UNION_ROOM_CLASSES;
+    return FacilityClassToPicIndex(gUnionRoomFacilityClasses[arrId]);
 }
 
 u16 GetUnionRoomTrainerClass(void)
 {
     u8 linkId = GetMultiplayerId() ^ 1;
-    u32 arrId = gLinkPlayers[linkId].trainerId & 7;
 
-    arrId |= gLinkPlayers[linkId].gender << 3;
-    return gFacilityClassToTrainerClass[gLinkPlayerFacilityClasses[arrId]];
+    u32 arrId = gLinkPlayers[linkId].trainerId % NUM_UNION_ROOM_CLASSES;
+    arrId |= gLinkPlayers[linkId].gender * NUM_UNION_ROOM_CLASSES;
+    return gFacilityClassToTrainerClass[gUnionRoomFacilityClasses[arrId]];
 }
 
 void CreateEventLegalEnemyMon(void)

@@ -813,8 +813,8 @@ static const u8 sBallCatchBonuses[] =
     [ITEM_SAFARI_BALL - ITEM_ULTRA_BALL] = 15
 };
 
-// not used
-static const u32 gUnknown_8250898 = 0xFF7EAE60;
+// unknown unused data
+static const u32 sUnused = 0xFF7EAE60;
 
 static void Cmd_attackcanceler(void)
 {
@@ -5824,7 +5824,7 @@ static void DrawLevelUpBannerText(void)
 
     printerTemplate.currentChar = gStringVar4;
     printerTemplate.windowId = B_WIN_LEVEL_UP_BANNER;
-    printerTemplate.fontId = FONT_0;
+    printerTemplate.fontId = FONT_SMALL;
     printerTemplate.x = 32;
     printerTemplate.y = 0;
     printerTemplate.currentX = 32;

@@ -167,7 +167,7 @@ static bool8 MultiMove_Function_Single(void)
         if (!IsDma3ManagerBusyWithBgCopy())
         {
             SetCursorPriorityTo1();
-            LoadPalette(stdpal_get(3), 0xD0, 0x20);
+            LoadPalette(GetTextWindowPalette(3), 0xD0, 0x20);
             ShowBg(0);
             return FALSE;
         }
@@ -273,7 +273,7 @@ static bool8 MultiMove_Function_PlaceMons(void)
     case 3:
         if (!IsDma3ManagerBusyWithBgCopy())
         {
-            LoadPalette(stdpal_get(3), 0xD0, 0x20);
+            LoadPalette(GetTextWindowPalette(3), 0xD0, 0x20);
             SetCursorPriorityTo1();
             ShowBg(0);
             return FALSE;
@@ -1147,7 +1147,7 @@ void PrintItemDescription(void)
         description = ItemId_GetDescription(gStorage->displayMonItemId);
 
     FillWindowPixelBuffer(2, PIXEL_FILL(1));
-    AddTextPrinterParameterized5(2, FONT_2, description, 2, 0, 0, NULL, 0, 0);
+    AddTextPrinterParameterized5(2, FONT_NORMAL, description, 2, 0, 0, NULL, 0, 0);
 }
 
 void InitItemInfoWindow(void)

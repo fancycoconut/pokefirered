@@ -153,31 +153,31 @@ static const struct OamData sOamData_MonSprite = {
 };
 
 
-static const union AffineAnimCmd gUnknown_84599E0[] = {
+static const union AffineAnimCmd sAffineAnim_Zoom_0[] = {
     AFFINEANIMCMD_FRAME(0x100, 0x100, 0, 0),
     AFFINEANIMCMD_END
 };
 
-static const union AffineAnimCmd gUnknown_84599F0[] = {
+static const union AffineAnimCmd sAffineAnim_Zoom_1[] = {
     AFFINEANIMCMD_FRAME(0x155, 0x155, 0, 0),
     AFFINEANIMCMD_END
 };
 
-static const union AffineAnimCmd gUnknown_8459A00[] = {
+static const union AffineAnimCmd sAffineAnim_Zoom_2[] = {
     AFFINEANIMCMD_FRAME(0x1AA, 0x1AA, 0, 0),
     AFFINEANIMCMD_END
 };
 
-static const union AffineAnimCmd gUnknown_8459A10[] = {
+static const union AffineAnimCmd sAffineAnim_Zoom_3[] = {
     AFFINEANIMCMD_FRAME(0x200, 0x200, 0, 0),
     AFFINEANIMCMD_END
 };
 
 static const union AffineAnimCmd *const sAffineAnimTable_Zoom[] = {
-    gUnknown_84599E0,
-    gUnknown_84599F0,
-    gUnknown_8459A00,
-    gUnknown_8459A10
+    sAffineAnim_Zoom_0,
+    sAffineAnim_Zoom_1,
+    sAffineAnim_Zoom_2,
+    sAffineAnim_Zoom_3
 };
 
 static const struct SpriteTemplate sSpriteTemplate_MonSprite = {
@@ -236,13 +236,13 @@ static const struct OamData sOamData_LevelUpVertical = {
     .paletteNum = 0
 };
 
-static const union AnimCmd gUnknown_8459AC0[] = {
+static const union AnimCmd sAnim_LevelUpVertical[] = {
     ANIMCMD_FRAME(0, 3),
     ANIMCMD_END
 };
 
 static const union AnimCmd *const sAnimTable_LevelUpVertical[] = {
-    gUnknown_8459AC0
+    sAnim_LevelUpVertical
 };
 
 static const struct SpriteTemplate sSpriteTemplate_LevelUpVertical = {
@@ -295,22 +295,22 @@ static const struct OamData sOamData_UseItem_OutwardSpiralDots = {
     .paletteNum = 0
 };
 
-static const union AnimCmd gUnknown_8459B0C[] = {
+static const union AnimCmd sAnim_UseItem_OutwardSpiralDots_0[] = {
     ANIMCMD_FRAME(0, 16),
     ANIMCMD_FRAME(1,  8),
     ANIMCMD_FRAME(2,  4),
     ANIMCMD_END
 };
 
-static const union AnimCmd gUnknown_8459B1C[] = {
+static const union AnimCmd sAnim_UseItem_OutwardSpiralDots_1[] = {
     ANIMCMD_FRAME(1, 4),
     ANIMCMD_FRAME(0, 4),
     ANIMCMD_END
 };
 
 static const union AnimCmd *const sAnimTable_UseItem_OutwardSpiralDots[] = {
-    gUnknown_8459B0C,
-    gUnknown_8459B1C
+    sAnim_UseItem_OutwardSpiralDots_0,
+    sAnim_UseItem_OutwardSpiralDots_1
 };
 
 static const struct SpriteTemplate sSpriteTemplate_UseItem_OutwardSpiralDots = {
@@ -341,7 +341,7 @@ void InitPokemonSpecialAnimScene(struct PokemonSpecialAnimScene * buffer, u16 an
     FillBgTilemapBufferRect_Palette0(0, 0x000, 0, 0, 32, 32);
     LoadBgGfxByAnimType(animType);
     FillWindowPixelBuffer(0, PIXEL_FILL(0));
-    TextWindow_SetUserSelectedFrame(0, 0x000, 0xe0);
+    LoadUserWindowGfx(0, 0x000, 0xe0);
     CopyWindowToVram(0, COPYWIN_FULL);
     ShowBg(0);
     ShowBg(3);
@@ -415,10 +415,10 @@ void PSA_PrintMessage(u8 messageId)
         DynamicPlaceholderTextUtil_ExpandPlaceholders(scene->textBuf, gText_MonLearnedTMHM);
         break;
     case 4:
-        strWidth += GetStringWidth(FONT_2, gText_Counting_2And, -1);
+        strWidth += GetStringWidth(FONT_NORMAL, gText_Counting_2And, -1);
         // fallthrough
     case 3:
-        strWidth += GetStringWidth(FONT_2, gText_Counting_1, -1);
+        strWidth += GetStringWidth(FONT_NORMAL, gText_Counting_1, -1);
         // fallthrough
     case 2: // 1
         StringCopy(scene->textBuf, s1_2_and_Poof_textPtrs[messageId - 2]);
@@ -443,7 +443,7 @@ void PSA_PrintMessage(u8 messageId)
         return;
     }
 
-    AddTextPrinterParameterized5(0, FONT_2, scene->textBuf, strWidth, 0, textSpeed, NULL, 0, 4);
+    AddTextPrinterParameterized5(0, FONT_NORMAL, scene->textBuf, strWidth, 0, textSpeed, NULL, 0, 4);
 }
 
 void PSA_AfterPoof_ClearMessageWindow(void)
@@ -1513,13 +1513,13 @@ void DrawLevelUpWindowPg1(u16 windowId, u16 *beforeStats, u16 *afterStats, u8 bg
 
     for (i = 0; i < 6; i++)
     {
-        AddTextPrinterParameterized3(windowId, FONT_2, 0, i * 15, textColor, TEXT_SKIP_DRAW, sLevelUpWindowStatNames[i]);
+        AddTextPrinterParameterized3(windowId, FONT_NORMAL, 0, i * 15, textColor, TEXT_SKIP_DRAW, sLevelUpWindowStatNames[i]);
         StringCopy(textbuf, diffStats[i] >= 0 ? gText_LevelUp_Plus : gText_LevelUp_Minus);
-        AddTextPrinterParameterized3(windowId, FONT_2, 56, i * 15, textColor, TEXT_SKIP_DRAW, textbuf);
+        AddTextPrinterParameterized3(windowId, FONT_NORMAL, 56, i * 15, textColor, TEXT_SKIP_DRAW, textbuf);
         textbuf[0] = CHAR_SPACE;
         x = abs(diffStats[i]) < 10 ? 12 : 6;
         ConvertIntToDecimalStringN(textbuf + 1, abs(diffStats[i]), STR_CONV_MODE_LEFT_ALIGN, 2);
-        AddTextPrinterParameterized3(windowId, FONT_2, x + 56, i * 15, textColor, TEXT_SKIP_DRAW, textbuf);
+        AddTextPrinterParameterized3(windowId, FONT_NORMAL, x + 56, i * 15, textColor, TEXT_SKIP_DRAW, textbuf);
     }
 }
 
@@ -1555,7 +1555,7 @@ void DrawLevelUpWindowPg2(u16 windowId, u16 *currStats, u8 bgColor, u8 fgColor, 
             ndigits = 1;
         ConvertIntToDecimalStringN(textbuf, statsRearrange[i], STR_CONV_MODE_LEFT_ALIGN, ndigits);
         x = 6 * (4 - ndigits);
-        AddTextPrinterParameterized3(windowId, FONT_2, 0, i * 15, textColor, TEXT_SKIP_DRAW, sLevelUpWindowStatNames[i]);
-        AddTextPrinterParameterized3(windowId, FONT_2, 56 + x, i * 15, textColor, TEXT_SKIP_DRAW, textbuf);
+        AddTextPrinterParameterized3(windowId, FONT_NORMAL, 0, i * 15, textColor, TEXT_SKIP_DRAW, sLevelUpWindowStatNames[i]);
+        AddTextPrinterParameterized3(windowId, FONT_NORMAL, 56 + x, i * 15, textColor, TEXT_SKIP_DRAW, textbuf);
     }
 }

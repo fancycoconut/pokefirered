@@ -95,7 +95,7 @@ static u8 TeachyTvGrassAnimationCheckIfNeedsToGenerateGrassObj(s16 x, s16 y);
 static void TeachyTvGrassAnimationObjCallback(struct Sprite *sprite);
 static void TeachyTvRestorePlayerPartyCallback(void);
 static void TeachyTvPreBattleAnimAndSetBattleCallback(u8 taskId);
-static void TeachyTvLoadMapTilesetToBuffer(struct Tileset *ts, u8 *dstBuffer, u16 size);
+static void TeachyTvLoadMapTilesetToBuffer(const struct Tileset *ts, u8 *dstBuffer, u16 size);
 static void TeachyTvPushBackNewMapPalIndexArrayEntry(const struct MapLayout *mStruct, u16 *buf1, u8 *palIndexArray, u16 mapEntry, u16 offset);
 static void TeachyTvComputeMapTilesFromTilesetAndMetaTiles(const u16 *metaTilesArray, u8 *blockBuf, u8 *tileset);
 static void TeachyTvComputeSingleMapTileBlockFromTilesetAndMetaTiles(u8 *blockBuf, u8 *tileset, u8 metaTile);
@@ -150,7 +150,7 @@ static const struct WindowTemplate sWindowTemplates[] =
         .tilemapTop = 15,
         .width = 26,
         .height = 4,
-        .paletteNum = 0x3,
+        .paletteNum = 3,
         .baseBlock = 0x0EA,
     },
     {
@@ -159,7 +159,7 @@ static const struct WindowTemplate sWindowTemplates[] =
         .tilemapTop = 1,
         .width = 22,
         .height = 12,
-        .paletteNum = 0x3,
+        .paletteNum = 3,
         .baseBlock = 0x152,
     },
     DUMMY_WIN_TEMPLATE,
@@ -530,8 +530,8 @@ static void TeachyTvLoadGraphic(void)
     DecompressAndCopyTileDataToVram(1, gTeachyTv_Gfx, 0, 0, 0);
     LZDecompressWram(gTeachyTvScreen_Tilemap, sResources->screenTilemap);
     LZDecompressWram(gTeachyTvTitle_Tilemap, sResources->titleTilemap);
-    LoadCompressedPalette(gTeachyTv_Pal, 0, 0x80);
-    LoadPalette(&src, 0, sizeof(src));
+    LoadCompressedPalette(gTeachyTv_Pal, BG_PLTT_ID(0), 4 * PLTT_SIZE_4BPP);
+    LoadPalette(&src, BG_PLTT_ID(0), sizeof(src));
     LoadSpritePalette(&gSpritePalette_GeneralFieldEffect1);
     TeachyTvLoadBg3Map(sResources->buffer3);
 }
@@ -1276,7 +1276,7 @@ static void TeachyTvLoadBg3Map(u16 *buffer)
     Free(blockIndicesBuffer);
 }
 
-static void TeachyTvLoadMapTilesetToBuffer(struct Tileset *ts, u8 *dstBuffer, u16 size)
+static void TeachyTvLoadMapTilesetToBuffer(const struct Tileset *ts, u8 *dstBuffer, u16 size)
 {
     if (ts)
     {
@@ -1395,6 +1395,6 @@ static void TeachyTvLoadMapPalette(const struct MapLayout * mStruct, const u8 * 
             dest = mStruct->secondaryTileset->palettes[palIndexArray[i]];
         else
             dest = mStruct->primaryTileset->palettes[palIndexArray[i]];
-        LoadPalette(dest, 0x10 * (15 - i), 0x20);
+        LoadPalette(dest, BG_PLTT_ID(15 - i), PLTT_SIZE_4BPP);
     }
 }

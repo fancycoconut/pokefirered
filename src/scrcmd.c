@@ -1336,7 +1336,7 @@ static bool8 WaitForAorBPress(void)
             }
         }
     }
-    if (sub_8112CAC() == 1 || gQuestLogState == QL_STATE_PLAYBACK)
+    if (QL_GetPlaybackState() == QL_PLAYBACK_STATE_RUNNING || gQuestLogState == QL_STATE_PLAYBACK)
     {
         if (sQuestLogWaitButtonPressTimer == 120)
             return TRUE;
@@ -1401,7 +1401,7 @@ bool8 ScrCmd_waitbuttonpress(struct ScriptContext * ctx)
 {
     sQuestLogScriptContextPtr = ctx;
 
-    if (sub_8112CAC() == 1 || gQuestLogState == QL_STATE_PLAYBACK)
+    if (QL_GetPlaybackState() == QL_PLAYBACK_STATE_RUNNING || gQuestLogState == QL_STATE_PLAYBACK)
         sQuestLogWaitButtonPressTimer = 0;
     SetupNativeScript(ctx, WaitForAorBPress);
     return TRUE;
@@ -1818,7 +1818,7 @@ bool8 ScrCmd_showmoneybox(struct ScriptContext * ctx)
     u8 y = ScriptReadByte(ctx);
     u8 ignore = ScriptReadByte(ctx);
 
-    if (!ignore && QuestLog_SchedulePlaybackCB(QLPlaybackCB_DestroyScriptMenuMonPicSprites) != TRUE)
+    if (!ignore && QL_AvoidDisplay(QL_DestroyAbortedDisplay) != TRUE)
         DrawMoneyBox(GetMoney(&gSaveBlock1Ptr->money), x, y);
     return FALSE;
 }
@@ -1848,7 +1848,7 @@ bool8 ScrCmd_showcoinsbox(struct ScriptContext * ctx)
     u8 x = ScriptReadByte(ctx);
     u8 y = ScriptReadByte(ctx);
 
-    if (QuestLog_SchedulePlaybackCB(QLPlaybackCB_DestroyScriptMenuMonPicSprites) != TRUE)
+    if (QL_AvoidDisplay(QL_DestroyAbortedDisplay) != TRUE)
         ShowCoinsWindow(GetCoins(), x, y);
     return FALSE;
 }
@@ -2222,21 +2222,21 @@ bool8 ScrCmd_normalmsg(struct ScriptContext * ctx)
     return FALSE;
 }
 
-// This command will set a Pokémon's eventLegal bit; there is no similar command to clear it.
-bool8 ScrCmd_setmoneventlegal(struct ScriptContext * ctx)
+// This command will set a Pokémon's modernFatefulEncounter bit; there is no similar command to clear it.
+bool8 ScrCmd_setmonmodernfatefulencounter(struct ScriptContext * ctx)
 {
-    bool8 isEventLegal = TRUE;
+    bool8 isModernFatefulEncounter = TRUE;
     u16 partyIndex = VarGet(ScriptReadHalfword(ctx));
 
-    SetMonData(&gPlayerParty[partyIndex], MON_DATA_EVENT_LEGAL, &isEventLegal);
+    SetMonData(&gPlayerParty[partyIndex], MON_DATA_MODERN_FATEFUL_ENCOUNTER, &isModernFatefulEncounter);
     return FALSE;
 }
 
-bool8 ScrCmd_checkmoneventlegal(struct ScriptContext * ctx)
+bool8 ScrCmd_checkmonmodernfatefulencounter(struct ScriptContext * ctx)
 {
     u16 partyIndex = VarGet(ScriptReadHalfword(ctx));
 
-    gSpecialVar_Result = GetMonData(&gPlayerParty[partyIndex], MON_DATA_EVENT_LEGAL, NULL);
+    gSpecialVar_Result = GetMonData(&gPlayerParty[partyIndex], MON_DATA_MODERN_FATEFUL_ENCOUNTER, NULL);
     return FALSE;
 }
 
